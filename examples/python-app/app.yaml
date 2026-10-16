@@ -1,0 +1,20 @@
+pre:
+  linux: |
+    python3 -m venv .venv
+    .venv/bin/pip install --cache-dir "$CACHE_DIR/pip" -r requirements.txt
+  windows: |
+    python -m venv .venv
+    .venv\Scripts\pip install --cache-dir "$env:CACHE_DIR\pip" -r requirements.txt
+
+run:
+  linux: .venv/bin/python app.py
+  windows: .venv\Scripts\python app.py
+
+persist:
+  - data/
+
+health:
+  http: /healthz
+  interval: 30s
+  timeout: 5s
+  retries: 3
