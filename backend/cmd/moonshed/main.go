@@ -205,7 +205,7 @@ func serve(root string) error {
 		if err != nil {
 			return err
 		}
-		srv := &http.Server{Handler: apiServer, ReadHeaderTimeout: 10 * time.Second}
+		srv := &http.Server{Handler: apiServer, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second}
 		go func() {
 			if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				slog.Error("http server", "err", err)

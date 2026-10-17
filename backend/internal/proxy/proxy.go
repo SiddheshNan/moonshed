@@ -1,5 +1,7 @@
-// Package proxy is the built-in reverse proxy: host/path routing to apps, HTTPS via
-// Let's Encrypt or uploaded certificates, and per-domain traffic counters.
+// Package proxy is the built-in reverse proxy: an embedded Caddy server whose
+// Caddyfile is generated from the domains in the database, plus whatever raw
+// Caddyfile users add per domain or globally. It also keeps per-domain traffic
+// counters and feeds the request log.
 package proxy
 
 import (
@@ -7,23 +9,22 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"os"
 	"path/filepath"
-	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/caddyserver/certmagic"
+	"github.com/caddyserver/caddy/v2"
+	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
+	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
+	_ "github.com/caddyserver/caddy/v2/modules/standard"
 
 	"moonshed/internal/config"
 	"moonshed/internal/metrics"
@@ -32,12 +33,13 @@ import (
 )
 
 const (
-	SettingEnabled    = "proxy_enabled"
-	SettingACMEEmail  = "acme_email"
-	SettingPanelHost  = "panel_domain"
-	SettingPanelTLS   = "panel_tls"
-	acmeTLSALPNProto  = "acme-tls/1"
-	readHeaderTimeout = 10 * time.Second
+	SettingEnabled        = "proxy_enabled"
+	SettingACMEEmail      = "acme_email"
+	SettingPanelHost      = "panel_domain"
+	SettingPanelTLS       = "panel_tls"
+	SettingTrustedProxies = "proxy_trusted_proxies" // space separated
+	SettingGlobalOptions  = "proxy_global_options"
+	SettingExtraSites     = "proxy_extra_sites"
 )
 
 type Proxy struct {
@@ -47,19 +49,16 @@ type Proxy struct {
 	httpsAddr string
 	panel     http.Handler
 	requests  *requestlog.Log
+	traffic   sync.Map
 
-	table   atomic.Pointer[table]
-	custom  atomic.Pointer[map[string]*tls.Certificate]
-	issuer  atomic.Pointer[certmagic.ACMEIssuer]
-	magic   *certmagic.Config
-	cache   *certmagic.Cache
-	traffic sync.Map
+	// certs counts certificate uploads and removals. A changed certificate keeps
+	// its file path, so the config only looks different to Caddy through this.
+	certs atomic.Int64
 
-	mu      sync.Mutex
-	email   string
-	managed map[string]bool
-	servers []*http.Server
-	lastErr string
+	mu         sync.Mutex
+	running    bool
+	lastErr    string
+	loadedCert int64
 }
 
 type Status struct {
@@ -78,124 +77,132 @@ func New(st *store.Store, paths config.Paths, cfg config.Config, panel http.Hand
 		httpAddr:  cfg.HTTPAddr,
 		httpsAddr: cfg.HTTPSAddr,
 		panel:     panel,
-		managed:   map[string]bool{},
 	}
-	p.table.Store(&table{})
-	p.custom.Store(&map[string]*tls.Certificate{})
-	certmagic.Default.Logger = logger
-	p.cache = certmagic.NewCache(certmagic.CacheOptions{
-		GetConfigForCert: func(certmagic.Certificate) (*certmagic.Config, error) { return p.magic, nil },
-		Logger:           logger,
-	})
-	p.magic = certmagic.New(p.cache, certmagic.Config{
-		Storage: &certmagic.FileStorage{Path: filepath.Join(paths.Certs(), "acme")},
-		Logger:  logger,
-	})
-	p.setIssuer("")
+	current.Store(p)
 	return p
 }
 
-func (p *Proxy) setIssuer(email string) {
-	iss := certmagic.NewACMEIssuer(p.magic, certmagic.ACMEIssuer{
-		CA:     certmagic.LetsEncryptProductionCA,
-		Email:  email,
-		Agreed: true,
-		Logger: logger,
-	})
-	p.magic.Issuers = []certmagic.Issuer{iss}
-	p.issuer.Store(iss)
-}
-
-// Reload rebuilds the routing table from the database and starts or stops the listeners.
-func (p *Proxy) Reload(ctx context.Context) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
+// Input reads everything the Caddyfile is generated from.
+func (p *Proxy) Input() (*Input, error) {
 	settings, err := p.store.Settings()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	domains, err := p.store.Domains("")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	apps, err := p.store.Apps()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	ports := map[string]int{}
 	for _, a := range apps {
 		ports[a.ID] = a.Port
 	}
+	return &Input{
+		HTTPAddr:       p.httpAddr,
+		HTTPSAddr:      p.httpsAddr,
+		Storage:        filepath.Join(p.paths.Certs(), "acme"),
+		Email:          settings[SettingACMEEmail],
+		PanelHost:      normalizeHost(settings[SettingPanelHost]),
+		PanelTLS:       cmp.Or(settings[SettingPanelTLS], store.TLSNone),
+		Domains:        domains,
+		Ports:          ports,
+		CertFiles:      func(host string) (string, string) { return p.certFile(host), p.keyFile(host) },
+		TrustedProxies: strings.Fields(settings[SettingTrustedProxies]),
+		GlobalOptions:  settings[SettingGlobalOptions],
+		ExtraSites:     settings[SettingExtraSites],
+	}, nil
+}
 
-	t := &table{
-		hosts:     map[string][]*route{},
-		panelHost: normalizeHost(settings[SettingPanelHost]),
-		panelTLS:  cmp.Or(settings[SettingPanelTLS], store.TLSNone),
-	}
-	tlsHosts := map[string]string{}
-	if t.panelHost != "" {
-		tlsHosts[t.panelHost] = t.panelTLS
-	}
-	for _, d := range domains {
-		port := ports[d.AppID]
-		if port == 0 {
-			continue
-		}
-		t.hosts[d.Host] = append(t.hosts[d.Host], &route{appID: d.AppID, path: d.Path, port: port, tls: d.TLS, proxy: reverseProxy(port)})
-		if d.TLS != store.TLSNone {
-			tlsHosts[d.Host] = d.TLS
-		}
-	}
-	for _, routes := range t.hosts {
-		slices.SortFunc(routes, func(a, b *route) int { return len(b.path) - len(a.path) })
-	}
-	p.table.Store(t)
+// Reload regenerates the config and applies it, or stops the proxy when it is turned off.
+// Caddy swaps configs gracefully, but a swap closes idle keep-alive connections and can
+// drop a connection that arrives at that instant, so an unchanged config is not reloaded.
+// If the config only fails because of raw Caddyfile users wrote, the proxy runs
+// without it and Status reports the error.
+func (p *Proxy) Reload(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	custom := map[string]*tls.Certificate{}
-	var acme []string
-	for host, mode := range tlsHosts {
-		switch mode {
-		case store.TLSCustom:
-			cert, err := tls.LoadX509KeyPair(p.certFile(host), p.keyFile(host))
-			if err != nil {
-				slog.Warn("custom certificate", "host", host, "err", err)
-				continue
-			}
-			custom[host] = &cert
-		case store.TLSLetsEncrypt:
-			acme = append(acme, host)
-		}
-	}
-	p.custom.Store(&custom)
-
-	enabled := settings[SettingEnabled] == "true"
-	if !enabled {
-		p.stopServers()
-		return nil
-	}
-	if err := p.startServers(); err != nil {
+	enabled, err := p.store.Setting(SettingEnabled)
+	if err != nil {
 		return err
 	}
-	if email := settings[SettingACMEEmail]; email != p.email {
-		p.email = email
-		p.setIssuer(email)
+	if enabled != "true" {
+		p.stop()
+		p.lastErr = ""
+		return nil
 	}
-	var fresh []string
-	for _, host := range acme {
-		if !p.managed[host] {
-			fresh = append(fresh, host)
-		}
+	in, err := p.Input()
+	if err != nil {
+		return err
 	}
-	if len(fresh) > 0 {
-		if err := p.magic.ManageAsync(context.WithoutCancel(ctx), fresh); err != nil {
-			return fmt.Errorf("let's encrypt: %w", err)
+	certs := p.certs.Load()
+	force := !p.running || certs != p.loadedCert
+	err = load(in, force)
+	if err != nil {
+		safe := *in
+		safe.SafeMode = true
+		if load(&safe, force) == nil {
+			p.running, p.loadedCert = true, certs
+			p.lastErr = "Running without the advanced config, which failed: " + err.Error()
+			slog.Error("proxy: advanced config failed, running without it", "err", err)
+			return nil
 		}
-		for _, host := range fresh {
-			p.managed[host] = true
-		}
+		p.lastErr = err.Error()
+		return fmt.Errorf("proxy: %w", err)
 	}
+	p.running, p.loadedCert = true, certs
+	p.lastErr = ""
 	return nil
+}
+
+// load applies in. Caddy skips configs identical to the running one unless forced.
+func load(in *Input, force bool) error {
+	cfg, err := adapt(generate(in))
+	if err != nil {
+		return err
+	}
+	return caddy.Load(cfg, force)
+}
+
+// adapt turns Caddyfile text into Caddy's JSON config.
+func adapt(text string) ([]byte, error) {
+	adapter := caddyfile.Adapter{ServerType: httpcaddyfile.ServerType{}}
+	cfg, _, err := adapter.Adapt([]byte(text), map[string]any{"filename": "Caddyfile"})
+	return cfg, err
+}
+
+// Check builds the config with edit applied (a domain or setting not saved yet) and
+// validates it without running it. It returns the generated Caddyfile either way.
+func (p *Proxy) Check(edit func(*Input)) (string, error) {
+	in, err := p.Input()
+	if err != nil {
+		return "", err
+	}
+	if edit != nil {
+		edit(in)
+	}
+	text := generate(in)
+	raw, err := adapt(text)
+	if err != nil {
+		return text, err
+	}
+	var cfg caddy.Config
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		return text, err
+	}
+	return text, caddy.Validate(&cfg)
+}
+
+// Caddyfile returns the config generated from the current database state.
+func (p *Proxy) Caddyfile() (string, error) {
+	in, err := p.Input()
+	if err != nil {
+		return "", err
+	}
+	return generate(in), nil
 }
 
 func (p *Proxy) Status() Status {
@@ -204,132 +211,27 @@ func (p *Proxy) Status() Status {
 	enabled, _ := p.store.Setting(SettingEnabled)
 	return Status{
 		Enabled:   enabled == "true",
-		Listening: len(p.servers) > 0,
+		Listening: p.running,
 		HTTPAddr:  p.httpAddr,
 		HTTPSAddr: p.httpsAddr,
 		Error:     p.lastErr,
 	}
 }
 
-func (p *Proxy) startServers() error {
-	if len(p.servers) > 0 {
-		return nil
+func (p *Proxy) stop() {
+	if !p.running {
+		return
 	}
-	httpLn, err := net.Listen("tcp", p.httpAddr)
-	if err != nil {
-		p.lastErr = err.Error()
-		return fmt.Errorf("proxy: %w", err)
+	if err := caddy.Stop(); err != nil {
+		slog.Error("proxy stop", "err", err)
 	}
-	httpsLn, err := net.Listen("tcp", p.httpsAddr)
-	if err != nil {
-		httpLn.Close()
-		p.lastErr = err.Error()
-		return fmt.Errorf("proxy: %w", err)
-	}
-	p.lastErr = ""
-
-	httpSrv := &http.Server{Handler: http.HandlerFunc(p.serveHTTP), ReadHeaderTimeout: readHeaderTimeout}
-	httpsSrv := &http.Server{
-		Handler:           http.HandlerFunc(p.serve),
-		ReadHeaderTimeout: readHeaderTimeout,
-		TLSConfig: &tls.Config{
-			GetCertificate: p.getCertificate,
-			NextProtos:     []string{"h2", "http/1.1", acmeTLSALPNProto},
-			MinVersion:     tls.VersionTLS12,
-		},
-	}
-	go func() { logServeErr(httpSrv.Serve(httpLn)) }()
-	go func() { logServeErr(httpsSrv.ServeTLS(httpsLn, "", "")) }()
-	p.servers = []*http.Server{httpSrv, httpsSrv}
-	slog.Info("proxy listening", "http", p.httpAddr, "https", p.httpsAddr)
-	return nil
-}
-
-func logServeErr(err error) {
-	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		slog.Error("proxy server", "err", err)
-	}
-}
-
-func (p *Proxy) stopServers() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	for _, srv := range p.servers {
-		srv.Shutdown(ctx)
-	}
-	p.servers = nil
+	p.running = false
 }
 
 func (p *Proxy) Shutdown() {
 	p.mu.Lock()
-	p.stopServers()
+	p.stop()
 	p.mu.Unlock()
-	p.cache.Stop()
-}
-
-func (p *Proxy) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-	if cert := (*p.custom.Load())[normalizeHost(hello.ServerName)]; cert != nil {
-		return cert, nil
-	}
-	return p.magic.GetCertificate(hello)
-}
-
-func (p *Proxy) serveHTTP(w http.ResponseWriter, r *http.Request) {
-	if iss := p.issuer.Load(); iss != nil && iss.HandleHTTPChallenge(w, r) {
-		return
-	}
-	p.serve(w, r)
-}
-
-func (p *Proxy) serve(w http.ResponseWriter, r *http.Request) {
-	host := normalizeHost(r.Host)
-	t := p.table.Load()
-	if host != "" && host == t.panelHost {
-		if r.TLS == nil && t.panelTLS != store.TLSNone {
-			p.redirect(w, r, host)
-			return
-		}
-		p.panel.ServeHTTP(w, r)
-		return
-	}
-	rt := t.match(host, r.URL.Path)
-	if rt == nil {
-		http.Error(w, "No app is configured for this domain.", http.StatusNotFound)
-		return
-	}
-	if r.TLS == nil && rt.tls != store.TLSNone {
-		p.redirect(w, r, host)
-		return
-	}
-	start := time.Now()
-	rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
-	rt.proxy.ServeHTTP(rec, r)
-	took := time.Since(start)
-	p.count(host, rec.status, took)
-	if p.requests.Recording(rt.appID) {
-		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-		p.requests.Record(requestlog.Entry{
-			AppID:      rt.appID,
-			Time:       start.UnixMilli(),
-			Method:     r.Method,
-			Host:       host,
-			Path:       r.URL.Path,
-			Query:      r.URL.RawQuery,
-			Status:     rec.status,
-			DurationMS: float64(took.Microseconds()) / 1000,
-			Bytes:      rec.bytes,
-			IP:         ip,
-			UserAgent:  r.UserAgent(),
-			Referer:    r.Referer(),
-		})
-	}
-}
-
-func (p *Proxy) redirect(w http.ResponseWriter, r *http.Request, host string) {
-	if _, port, err := net.SplitHostPort(p.httpsAddr); err == nil && port != "443" {
-		host = net.JoinHostPort(host, port)
-	}
-	http.Redirect(w, r, "https://"+host+r.URL.RequestURI(), http.StatusPermanentRedirect)
 }
 
 type counters struct {
@@ -365,64 +267,6 @@ func (p *Proxy) Drain() map[string]metrics.Traffic {
 	return out
 }
 
-type table struct {
-	hosts     map[string][]*route
-	panelHost string
-	panelTLS  string
-}
-
-type route struct {
-	appID string
-	path  string
-	port  int
-	tls   string
-	proxy *httputil.ReverseProxy
-}
-
-func (t *table) match(host, path string) *route {
-	for _, r := range t.hosts[host] {
-		prefix := strings.TrimSuffix(r.path, "/")
-		if prefix == "" || path == prefix || strings.HasPrefix(path, prefix+"/") {
-			return r
-		}
-	}
-	return nil
-}
-
-func reverseProxy(port int) *httputil.ReverseProxy {
-	target := &url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", strconv.Itoa(port))}
-	return &httputil.ReverseProxy{
-		Rewrite: func(pr *httputil.ProxyRequest) {
-			pr.SetURL(target)
-			pr.SetXForwarded()
-			pr.Out.Host = pr.In.Host
-		},
-		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
-			slog.Debug("proxy upstream", "port", port, "err", err)
-			http.Error(w, "The app is not responding.", http.StatusBadGateway)
-		},
-	}
-}
-
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-	bytes  int64
-}
-
-func (r *statusRecorder) Write(b []byte) (int, error) {
-	n, err := r.ResponseWriter.Write(b)
-	r.bytes += int64(n)
-	return n, err
-}
-
-func (r *statusRecorder) WriteHeader(code int) {
-	r.status = code
-	r.ResponseWriter.WriteHeader(code)
-}
-
-func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
-
 func normalizeHost(host string) string {
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
@@ -457,6 +301,7 @@ func (p *Proxy) SaveCertificate(host string, certPEM, keyPEM []byte) error {
 	if err := os.MkdirAll(filepath.Dir(p.certFile(host)), 0o700); err != nil {
 		return err
 	}
+	defer p.certs.Add(1)
 	if err := os.WriteFile(p.certFile(host), certPEM, 0o644); err != nil {
 		return err
 	}
@@ -468,9 +313,16 @@ func (p *Proxy) HasCertificate(host string) bool {
 	return err == nil
 }
 
+// CertificateCovers reports whether the uploaded certificate for host is also valid for name.
+func (p *Proxy) CertificateCovers(host, name string) bool {
+	pair, err := tls.LoadX509KeyPair(p.certFile(host), p.keyFile(host))
+	return err == nil && pair.Leaf != nil && pair.Leaf.VerifyHostname(name) == nil
+}
+
 func (p *Proxy) DeleteCertificate(host string) {
 	os.Remove(p.certFile(host))
 	os.Remove(p.keyFile(host))
+	p.certs.Add(1)
 }
 
 type CertInfo struct {

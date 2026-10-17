@@ -37,13 +37,41 @@ export interface CertInfo {
   not_after: string;
 }
 
+export interface HeaderRule {
+  op: 'set' | 'add' | 'remove';
+  name: string;
+  value: string;
+}
+
+// Proxy options for one domain. force_https, hsts and redirect_www apply to every path on the host.
+export interface DomainOptions {
+  force_https: boolean;
+  hsts: boolean;
+  redirect_www: boolean;
+  compress: boolean;
+  strip_prefix: boolean;
+  basic_auth: { user: string }[] | null;
+  allow_ips: string[] | null;
+  request_headers: HeaderRule[] | null;
+  response_headers: HeaderRule[] | null;
+  max_body: string;
+}
+
 export interface Domain {
   id: string;
   app_id: string;
   host: string;
   path: string;
   tls: TLSMode;
+  options: DomainOptions;
+  advanced: string;
   certificate: CertInfo | null;
+}
+
+export interface ProxyCheck {
+  ok: boolean;
+  error?: string;
+  caddyfile: string;
 }
 
 export interface App {
@@ -197,6 +225,9 @@ export interface Settings {
   acme_email: string;
   panel_domain: string;
   panel_tls: TLSMode;
+  trusted_proxies: string[];
+  global_options: string;
+  extra_sites: string;
   backup_cron: string;
   backup_keep: number;
 }

@@ -15,6 +15,7 @@ import { AuditPage } from './pages/settings/Audit';
 import { CertificatesPage } from './pages/settings/Certificates';
 import { GeneralSettingsPage } from './pages/settings/General';
 import { GitSettingsPage } from './pages/settings/Git';
+import { ProxySettingsPage } from './pages/settings/Proxy';
 import { TokensPage } from './pages/settings/Tokens';
 import { UsersPage } from './pages/settings/Users';
 import type { AuthStatus } from './types';
@@ -43,6 +44,7 @@ export function App() {
         <Route path="/deployments" element={<DeploymentsPage />} />
         <Route path="/requests" element={<RequestsPage />} />
         <Route path="/settings" element={<GeneralSettingsPage />} />
+        <Route path="/settings/proxy" element={<ProxySettingsPage />} />
         <Route path="/settings/git" element={<GitSettingsPage />} />
         <Route path="/settings/certificates" element={<CertificatesPage />} />
         <Route path="/settings/users" element={<UsersPage />} />

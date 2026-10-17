@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Alert, Anchor, Button, Card, Code, Group, NumberInput, SimpleGrid, Stack, Switch, Text, TextInput } from '@mantine/core';
+import { Alert, Anchor, Button, Card, Code, Group, NumberInput, SimpleGrid, Stack, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router';
 
 import { api, queryClient } from '../../api';
 import {
@@ -20,7 +21,7 @@ import { BackupTable } from '../app/Backups';
 export function GeneralSettingsPage() {
   return (
     <Stack gap="lg" maw={960}>
-      <PageHeader crumbs={[{ label: 'Settings' }]} title="General" description="Reverse proxy, panel access and platform backups." />
+      <PageHeader crumbs={[{ label: 'Settings' }]} title="General" description="Panel access and platform backups." />
       <GeneralSettings />
       <PlatformBackups />
     </Stack>
@@ -69,7 +70,7 @@ function GeneralSettings() {
   });
 
   if (!form || !query.data) return null;
-  const { proxy, panel_addr, panel_certificate } = query.data;
+  const { panel_addr, panel_certificate } = query.data;
   const panel = panelURL(panel_addr);
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setForm({ ...form, [key]: value });
   const customPanelCert = !!form.panel_domain && form.panel_tls === 'custom';
@@ -83,34 +84,6 @@ function GeneralSettings() {
       }}
     >
       <Stack gap="lg">
-        <Card>
-          <Stack>
-            <div>
-              <Text fw={600}>Reverse proxy</Text>
-              <Text size="sm" c="dimmed">
-                Routes app domains and handles HTTPS on {proxy.http_addr} and {proxy.https_addr} (set in config.yaml).
-              </Text>
-            </div>
-            {proxy.error && (
-              <Alert color="red" variant="light">
-                {proxy.error}
-              </Alert>
-            )}
-            <Switch
-              label={proxy.listening ? 'Enabled (listening)' : 'Enabled'}
-              checked={form.proxy_enabled}
-              onChange={(e) => set('proxy_enabled', e.currentTarget.checked)}
-            />
-            <TextInput
-              label="Let's Encrypt email"
-              description="Used for expiry notices from Let's Encrypt (optional)"
-              value={form.acme_email}
-              onChange={(e) => set('acme_email', e.currentTarget.value)}
-              maw={420}
-            />
-          </Stack>
-        </Card>
-
         <Card>
           <Stack>
             <div>
@@ -144,7 +117,11 @@ function GeneralSettings() {
             </SimpleGrid>
             {form.panel_domain && !form.proxy_enabled && (
               <Alert color="orange" variant="light">
-                The panel domain only works while the reverse proxy is enabled.
+                The panel domain only works while the reverse proxy is enabled. Turn it on under{' '}
+                <Anchor component={Link} to="/settings/proxy" size="sm">
+                  Settings › Proxy
+                </Anchor>
+                .
               </Alert>
             )}
             {customPanelCert && (

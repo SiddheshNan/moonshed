@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ActionIcon, Anchor, Badge, Button, Card, Code, Fieldset, Group, Modal, Stack, Table, Text, TextInput, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
-import { IconCertificate, IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconCertificate, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 
@@ -17,6 +17,7 @@ import {
 } from '../../components/Certificate';
 import { tlsLabels, TLSPicker } from '../../components/TLSPicker';
 import type { App, Domain, ServerInfo, TLSMode } from '../../types';
+import { DomainEditor } from './DomainEditor';
 
 
 export function Domains({ app }: { app: App }) {
@@ -25,6 +26,7 @@ export function Domains({ app }: { app: App }) {
   const [tls, setTLS] = useState<TLSMode>('letsencrypt');
   const [cert, setCert] = useState<CertificateValue>(emptyCertificate);
   const [replacing, setReplacing] = useState<Domain | null>(null);
+  const [editing, setEditing] = useState<Domain | null>(null);
   const server = useQuery({ queryKey: ['server'], queryFn: () => api.get<ServerInfo>('/server') });
 
   const refresh = () => {
@@ -80,9 +82,16 @@ export function Domains({ app }: { app: App }) {
                     </Anchor>
                   </Table.Td>
                   <Table.Td>
-                    <Badge variant="light" color={d.tls === 'none' ? 'gray' : 'green'}>
-                      {tlsLabels[d.tls]}
-                    </Badge>
+                    <Group gap={4} wrap="nowrap">
+                      <Badge variant="light" color={d.tls === 'none' ? 'gray' : 'green'}>
+                        {tlsLabels[d.tls]}
+                      </Badge>
+                      {optionBadges(d).map((label) => (
+                        <Badge key={label} variant="outline" color="gray">
+                          {label}
+                        </Badge>
+                      ))}
+                    </Group>
                   </Table.Td>
                   <Table.Td maw={320}>
                     {d.tls === 'custom' ? (
@@ -95,6 +104,11 @@ export function Domains({ app }: { app: App }) {
                   </Table.Td>
                   <Table.Td>
                     <Group gap={4} justify="flex-end" wrap="nowrap">
+                      <Tooltip label="Edit proxy settings">
+                        <ActionIcon variant="subtle" color="gray" onClick={() => setEditing(d)}>
+                          <IconPencil size={16} />
+                        </ActionIcon>
+                      </Tooltip>
                       {d.tls === 'custom' && (
                         <Tooltip label="Replace certificate">
                           <ActionIcon variant="subtle" color="gray" onClick={() => setReplacing(d)}>
@@ -137,7 +151,7 @@ export function Domains({ app }: { app: App }) {
             {proxyOff ? (
               <>
                 The reverse proxy is off.{' '}
-                <Anchor component={Link} to="/settings" size="sm">
+                <Anchor component={Link} to="/settings/proxy" size="sm">
                   Turn it on
                 </Anchor>{' '}
                 to serve domains.
@@ -192,9 +206,24 @@ export function Domains({ app }: { app: App }) {
         </form>
       </Card>
 
+      <DomainEditor domain={editing} onClose={() => setEditing(null)} onSaved={refresh} />
       <ReplaceCertificate domain={replacing} shared={replacing ? sharedPaths(replacing) : false} onClose={() => setReplacing(null)} onDone={refresh} />
     </Stack>
   );
+}
+
+// optionBadges names the non-default settings on a domain.
+function optionBadges(d: Domain): string[] {
+  const o = d.options;
+  const out: string[] = [];
+  if (o.basic_auth?.length) out.push('Password');
+  if (o.allow_ips?.length) out.push('IP allow list');
+  if (o.request_headers?.length || o.response_headers?.length) out.push('Headers');
+  if (o.compress) out.push('Compressed');
+  if (o.strip_prefix && d.path !== '/') out.push('Strip prefix');
+  if (o.redirect_www) out.push('www redirect');
+  if (d.advanced) out.push('Advanced');
+  return out;
 }
 
 function ReplaceCertificate({

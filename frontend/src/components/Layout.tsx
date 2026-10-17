@@ -33,6 +33,7 @@ import {
   IconSun,
   IconTransfer,
   IconUsers,
+  IconWorld,
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from 'react-router';
@@ -72,6 +73,7 @@ const home = [
 
 const settings = [
   { to: '/settings', label: 'General', icon: IconSettings, exact: true },
+  { to: '/settings/proxy', label: 'Proxy', icon: IconWorld },
   { to: '/settings/git', label: 'Git', icon: IconGitBranch },
   { to: '/settings/certificates', label: 'Certificates', icon: IconCertificate },
   { to: '/settings/users', label: 'Users', icon: IconUsers },

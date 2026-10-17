@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 )
 
@@ -225,11 +226,40 @@ func (s *Store) SetEnv(appID string, env map[string]string) error {
 }
 
 type Domain struct {
-	ID    string `json:"id"`
-	AppID string `json:"app_id"`
-	Host  string `json:"host"`
-	Path  string `json:"path"`
-	TLS   string `json:"tls"`
+	ID       string        `json:"id"`
+	AppID    string        `json:"app_id"`
+	Host     string        `json:"host"`
+	Path     string        `json:"path"`
+	TLS      string        `json:"tls"`
+	Options  DomainOptions `json:"options"`
+	Advanced string        `json:"advanced"` // raw Caddyfile directives for this host+path
+}
+
+// DomainOptions are the proxy settings the UI exposes as plain controls.
+// ForceHTTPS, HSTS and RedirectWWW act on the whole host, so every path on
+// a host carries the same values.
+type DomainOptions struct {
+	ForceHTTPS      bool            `json:"force_https"`
+	HSTS            bool            `json:"hsts"`
+	RedirectWWW     bool            `json:"redirect_www"`
+	Compress        bool            `json:"compress"`
+	StripPrefix     bool            `json:"strip_prefix"`
+	BasicAuth       []BasicAuthUser `json:"basic_auth"`
+	AllowIPs        []string        `json:"allow_ips"`
+	RequestHeaders  []HeaderRule    `json:"request_headers"`
+	ResponseHeaders []HeaderRule    `json:"response_headers"`
+	MaxBody         string          `json:"max_body"`
+}
+
+type BasicAuthUser struct {
+	User string `json:"user"`
+	Hash string `json:"hash,omitempty"` // bcrypt
+}
+
+type HeaderRule struct {
+	Op    string `json:"op"` // set, add or remove
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 const (
@@ -238,8 +268,22 @@ const (
 	TLSCustom      = "custom"
 )
 
+const domainColumns = "id, app_id, host, path, tls, options, advanced"
+
+func scanDomain(row interface{ Scan(...any) error }) (*Domain, error) {
+	var d Domain
+	var opts string
+	if err := row.Scan(&d.ID, &d.AppID, &d.Host, &d.Path, &d.TLS, &opts, &d.Advanced); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal([]byte(opts), &d.Options); err != nil {
+		return nil, fmt.Errorf("domain %s options: %w", d.ID, err)
+	}
+	return &d, nil
+}
+
 func (s *Store) Domains(appID string) ([]*Domain, error) {
-	query := "SELECT id, app_id, host, path, tls FROM domains"
+	query := "SELECT " + domainColumns + " FROM domains"
 	var args []any
 	if appID != "" {
 		query += " WHERE app_id = ?"
@@ -252,29 +296,33 @@ func (s *Store) Domains(appID string) ([]*Domain, error) {
 	defer rows.Close()
 	var out []*Domain
 	for rows.Next() {
-		var d Domain
-		if err := rows.Scan(&d.ID, &d.AppID, &d.Host, &d.Path, &d.TLS); err != nil {
+		d, err := scanDomain(rows)
+		if err != nil {
 			return nil, err
 		}
-		out = append(out, &d)
+		out = append(out, d)
 	}
 	return out, rows.Err()
 }
 
 func (s *Store) Domain(id string) (*Domain, error) {
-	var d Domain
-	err := s.db.QueryRow("SELECT id, app_id, host, path, tls FROM domains WHERE id = ?", id).
-		Scan(&d.ID, &d.AppID, &d.Host, &d.Path, &d.TLS)
-	return &d, notFound(err)
+	d, err := scanDomain(s.db.QueryRow("SELECT "+domainColumns+" FROM domains WHERE id = ?", id))
+	return d, notFound(err)
 }
 
 func (s *Store) SaveDomain(d *Domain) error {
+	opts, err := json.Marshal(d.Options)
+	if err != nil {
+		return err
+	}
 	if d.ID != "" {
-		_, err := s.db.Exec("UPDATE domains SET host = ?, path = ?, tls = ? WHERE id = ?", d.Host, d.Path, d.TLS, d.ID)
+		_, err := s.db.Exec("UPDATE domains SET host = ?, path = ?, tls = ?, options = ?, advanced = ? WHERE id = ?",
+			d.Host, d.Path, d.TLS, string(opts), d.Advanced, d.ID)
 		return err
 	}
 	d.ID = NewID()
-	_, err := s.db.Exec("INSERT INTO domains (id, app_id, host, path, tls) VALUES (?, ?, ?, ?, ?)", d.ID, d.AppID, d.Host, d.Path, d.TLS)
+	_, err = s.db.Exec("INSERT INTO domains ("+domainColumns+") VALUES (?, ?, ?, ?, ?, ?, ?)",
+		d.ID, d.AppID, d.Host, d.Path, d.TLS, string(opts), d.Advanced)
 	return err
 }
 

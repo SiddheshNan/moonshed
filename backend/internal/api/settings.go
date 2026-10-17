@@ -2,10 +2,13 @@ package api
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -15,12 +18,15 @@ import (
 )
 
 type settings struct {
-	ProxyEnabled bool   `json:"proxy_enabled"`
-	ACMEEmail    string `json:"acme_email"`
-	PanelDomain  string `json:"panel_domain"`
-	PanelTLS     string `json:"panel_tls"`
-	BackupCron   string `json:"backup_cron"`
-	BackupKeep   int    `json:"backup_keep"`
+	ProxyEnabled   bool     `json:"proxy_enabled"`
+	ACMEEmail      string   `json:"acme_email"`
+	PanelDomain    string   `json:"panel_domain"`
+	PanelTLS       string   `json:"panel_tls"`
+	TrustedProxies []string `json:"trusted_proxies"`
+	GlobalOptions  string   `json:"global_options"`
+	ExtraSites     string   `json:"extra_sites"`
+	BackupCron     string   `json:"backup_cron"`
+	BackupKeep     int      `json:"backup_keep"`
 }
 
 func (s *Server) loadSettings() (*settings, error) {
@@ -30,13 +36,73 @@ func (s *Server) loadSettings() (*settings, error) {
 	}
 	keep, _ := strconv.Atoi(m[backup.SettingKeep])
 	return &settings{
-		ProxyEnabled: m[proxy.SettingEnabled] == "true",
-		ACMEEmail:    m[proxy.SettingACMEEmail],
-		PanelDomain:  m[proxy.SettingPanelHost],
-		PanelTLS:     cmp.Or(m[proxy.SettingPanelTLS], store.TLSNone),
-		BackupCron:   m[backup.SettingCron],
-		BackupKeep:   cmp.Or(keep, 7),
+		ProxyEnabled:   m[proxy.SettingEnabled] == "true",
+		ACMEEmail:      m[proxy.SettingACMEEmail],
+		PanelDomain:    m[proxy.SettingPanelHost],
+		PanelTLS:       cmp.Or(m[proxy.SettingPanelTLS], store.TLSNone),
+		TrustedProxies: strings.Fields(m[proxy.SettingTrustedProxies]),
+		GlobalOptions:  m[proxy.SettingGlobalOptions],
+		ExtraSites:     m[proxy.SettingExtraSites],
+		BackupCron:     m[backup.SettingCron],
+		BackupKeep:     cmp.Or(keep, 7),
 	}, nil
+}
+
+// checkProxySettings validates the proxy part of in and the config it would produce.
+func (s *Server) checkProxySettings(in *settings) (string, error) {
+	var trusted []string
+	for _, p := range in.TrustedProxies {
+		if p = strings.TrimSpace(p); p == "" {
+			continue
+		}
+		if p != "private_ranges" {
+			if _, err := netip.ParsePrefix(p); err != nil {
+				if _, err := netip.ParseAddr(p); err != nil {
+					return "", badRequest("trusted proxy %q is not an IP address or CIDR range", p)
+				}
+			}
+		}
+		trusted = append(trusted, p)
+	}
+	in.TrustedProxies = trusted
+	in.GlobalOptions = strings.TrimSpace(in.GlobalOptions)
+	in.ExtraSites = strings.TrimSpace(in.ExtraSites)
+	if !proxy.Balanced(in.GlobalOptions) {
+		return "", badRequest("global options have unbalanced braces")
+	}
+	if !proxy.Balanced(in.ExtraSites) {
+		return "", badRequest("extra sites have unbalanced braces")
+	}
+	return s.Proxy.Check(func(pi *proxy.Input) {
+		pi.Email = in.ACMEEmail
+		pi.PanelHost, pi.PanelTLS = in.PanelDomain, in.PanelTLS
+		pi.TrustedProxies = in.TrustedProxies
+		pi.GlobalOptions, pi.ExtraSites = in.GlobalOptions, in.ExtraSites
+	})
+}
+
+// checkSettingsDraft validates proxy settings without saving them.
+func (s *Server) checkSettingsDraft(w http.ResponseWriter, r *http.Request) error {
+	var in settings
+	if err := decode(r, &in); err != nil {
+		return err
+	}
+	in.PanelDomain = proxy.NormalizeHost(in.PanelDomain)
+	in.PanelTLS = cmp.Or(in.PanelTLS, store.TLSNone)
+	text, err := s.checkProxySettings(&in)
+	var apiErr *apiError
+	if errors.As(err, &apiErr) {
+		return err
+	}
+	return ok(w, checkResult(text, err))
+}
+
+func (s *Server) proxyCaddyfile(w http.ResponseWriter, r *http.Request) error {
+	text, err := s.Proxy.Caddyfile()
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]string{"caddyfile": text})
 }
 
 func (s *Server) settingsResponse(st *settings) map[string]any {
@@ -63,7 +129,7 @@ func (s *Server) updateSettings(w http.ResponseWriter, r *http.Request) error {
 	in.PanelDomain = proxy.NormalizeHost(in.PanelDomain)
 	in.PanelTLS = cmp.Or(in.PanelTLS, store.TLSNone)
 	if in.PanelDomain != "" {
-		panel, err := domainInput{Host: in.PanelDomain, TLS: in.PanelTLS}.domain()
+		panel, err := domainInput{Host: in.PanelDomain, TLS: in.PanelTLS}.domain(nil)
 		if err != nil {
 			return err
 		}
@@ -88,13 +154,23 @@ func (s *Server) updateSettings(w http.ResponseWriter, r *http.Request) error {
 	if in.BackupKeep < 1 {
 		return badRequest("backups to keep must be at least 1")
 	}
+	if _, err := s.checkProxySettings(&in); err != nil {
+		var apiErr *apiError
+		if errors.As(err, &apiErr) {
+			return err
+		}
+		return badRequest("proxy config: %v", err)
+	}
 	values := map[string]string{
-		proxy.SettingEnabled:   strconv.FormatBool(in.ProxyEnabled),
-		proxy.SettingACMEEmail: in.ACMEEmail,
-		proxy.SettingPanelHost: in.PanelDomain,
-		proxy.SettingPanelTLS:  in.PanelTLS,
-		backup.SettingCron:     in.BackupCron,
-		backup.SettingKeep:     strconv.Itoa(in.BackupKeep),
+		proxy.SettingEnabled:        strconv.FormatBool(in.ProxyEnabled),
+		proxy.SettingACMEEmail:      in.ACMEEmail,
+		proxy.SettingPanelHost:      in.PanelDomain,
+		proxy.SettingPanelTLS:       in.PanelTLS,
+		proxy.SettingTrustedProxies: strings.Join(in.TrustedProxies, " "),
+		proxy.SettingGlobalOptions:  in.GlobalOptions,
+		proxy.SettingExtraSites:     in.ExtraSites,
+		backup.SettingCron:          in.BackupCron,
+		backup.SettingKeep:          strconv.Itoa(in.BackupKeep),
 	}
 	for k, v := range values {
 		if err := s.Store.SetSetting(k, v); err != nil {
@@ -126,6 +202,9 @@ func settingsChanges(a, b *settings) string {
 		{"proxy enabled", a.ProxyEnabled != b.ProxyEnabled},
 		{"let's encrypt email", a.ACMEEmail != b.ACMEEmail},
 		{"panel domain", a.PanelDomain != b.PanelDomain || a.PanelTLS != b.PanelTLS},
+		{"trusted proxies", !slices.Equal(a.TrustedProxies, b.TrustedProxies)},
+		{"proxy global options", a.GlobalOptions != b.GlobalOptions},
+		{"proxy extra sites", a.ExtraSites != b.ExtraSites},
 		{"platform backups", a.BackupCron != b.BackupCron || a.BackupKeep != b.BackupKeep},
 	} {
 		if c.differs {

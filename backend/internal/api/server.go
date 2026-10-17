@@ -116,6 +116,7 @@ func (s *Server) routes() {
 	s.private("PUT /api/domains/{id}", s.updateDomain)
 	s.private("DELETE /api/domains/{id}", s.deleteDomain)
 	s.private("PUT /api/domains/{id}/certificate", s.replaceDomainCertificate)
+	s.private("POST /api/domains/{id}/check", s.checkDomainDraft)
 
 	s.private("GET /api/platform/backups", s.listPlatformBackups)
 	s.private("POST /api/platform/backups", s.createPlatformBackup)
@@ -128,6 +129,8 @@ func (s *Server) routes() {
 	s.private("GET /api/settings", s.getSettings)
 	s.private("PUT /api/settings", s.updateSettings)
 	s.private("POST /api/settings/panel-certificate", s.uploadPanelCertificate)
+	s.private("POST /api/settings/proxy-check", s.checkSettingsDraft)
+	s.private("GET /api/proxy/caddyfile", s.proxyCaddyfile)
 
 	s.private("GET /api/audit", s.listAudit)
 

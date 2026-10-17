@@ -188,4 +188,9 @@ CREATE TABLE audit_log (
 	details     TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX audit_log_ts ON audit_log(ts);
+`,
+// Proxy options and raw Caddyfile per domain. Existing domains keep redirecting to HTTPS.
+`
+ALTER TABLE domains ADD COLUMN options  TEXT NOT NULL DEFAULT '{"force_https":true}';
+ALTER TABLE domains ADD COLUMN advanced TEXT NOT NULL DEFAULT '';
 `}
