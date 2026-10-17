@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router';
 import { api, queryClient } from '../../api';
 import type { App, Project, ServerInfo } from '../../types';
 
-function useSave(app: App) {
+export function useSave(app: App) {
   return useMutation({
     mutationFn: (fields: Record<string, unknown>) => api.put<App>(`/apps/${app.id}`, fields),
     onSuccess: () => {
@@ -21,18 +21,20 @@ function useSave(app: App) {
   });
 }
 
-function Section({
+export function Section({
   title,
   description,
   children,
   onSave,
   saving,
+  saveDisabled,
 }: {
   title: string;
   description?: string;
   children: ReactNode;
   onSave?: () => void;
   saving?: boolean;
+  saveDisabled?: boolean;
 }) {
   return (
     <Card padding="lg">
@@ -45,7 +47,7 @@ function Section({
       <Stack mt="md">{children}</Stack>
       {onSave && (
         <Group justify="flex-end" mt="md">
-          <Button size="sm" onClick={onSave} loading={saving}>
+          <Button size="sm" onClick={onSave} loading={saving} disabled={saveDisabled}>
             Save
           </Button>
         </Group>
@@ -68,6 +70,7 @@ function General({ app }: { app: App }) {
   const projects = useQuery({ queryKey: ['projects-list'], queryFn: () => api.get<Project[]>('/projects') });
   const [form, setForm] = useState({
     project_id: app.project_id,
+    port: app.port,
     runtime: app.runtime,
     keep_bundles: app.keep_bundles,
     log_retention_days: app.log_retention_days,
@@ -84,6 +87,14 @@ function General({ app }: { app: App }) {
         value={form.project_id}
         onChange={(v) => v && set('project_id', v)}
         allowDeselect={false}
+      />
+      <NumberInput
+        label="Port"
+        description="The port the app listens on, passed as $PORT. Used for domains and health checks. Takes effect on the next start."
+        min={1}
+        max={65535}
+        value={form.port || ''}
+        onChange={(v) => set('port', Number(v) || 0)}
       />
       {!app.current_release_id && (
         <Stack gap={6}>

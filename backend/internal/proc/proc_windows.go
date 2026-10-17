@@ -62,7 +62,11 @@ func scriptCommand(script, dir string) (*exec.Cmd, error) {
 			return nil, fmt.Errorf("%s: .sh scripts don't run on Windows", script)
 		}
 	}
-	full := "$ErrorActionPreference = 'Stop'\n$PSNativeCommandUseErrorActionPreference = $true\n" + script + "\nexit $LASTEXITCODE\n"
+	// With -EncodedCommand and redirected output, Windows PowerShell writes errors and
+	// progress to stderr as CLIXML. So progress is off, and errors are caught and
+	// written as plain text straight to the console stream.
+	full := "$ProgressPreference = 'SilentlyContinue'\n$ErrorActionPreference = 'Stop'\n$PSNativeCommandUseErrorActionPreference = $true\n" +
+		"try {\n" + script + "\n} catch {\n[Console]::Error.WriteLine(($_ | Out-String).Trim())\nexit 1\n}\nexit $LASTEXITCODE\n"
 	return powershell("-EncodedCommand", encodePowershell(full)), nil
 }
 

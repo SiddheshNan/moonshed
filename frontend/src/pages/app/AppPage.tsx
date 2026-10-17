@@ -1,4 +1,5 @@
-import { Alert, Badge, Button, Center, Loader, Stack, Tabs } from '@mantine/core';
+import { useState } from 'react';
+import { Alert, Badge, Button, Center, Loader, Modal, Stack, Tabs } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconPlayerPlay, IconPlayerStop, IconRefresh, IconRocket } from '@tabler/icons-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -16,6 +17,7 @@ import { Environment } from './Environment';
 import { Logs } from './Logs';
 import { Monitoring } from './Monitoring';
 import { Overview } from './Overview';
+import { UploadBundle } from './Source';
 import { AppSettings } from './Settings';
 
 const tabs = [
@@ -43,6 +45,7 @@ export function AppPage() {
   const navigate = useNavigate();
   const id = params.id ?? '';
   const tab = params['*'] || 'overview';
+  const [uploading, setUploading] = useState(false);
   const app = useQuery({ queryKey: ['app', id], queryFn: () => api.get<App>(`/apps/${id}`), refetchInterval: 3000 });
   const projects = useQuery({ queryKey: ['projects-list'], queryFn: () => api.get<Project[]>('/projects') });
 
@@ -94,11 +97,13 @@ export function AppPage() {
         description={deployedSummary(a)}
         actions={
           <>
-            {a.source === 'git' && a.current_release_id && (
-              <Button leftSection={<IconRocket size={16} />} onClick={() => action.mutate('deploy')} loading={action.isPending && action.variables === 'deploy'}>
-                Deploy
-              </Button>
-            )}
+            <Button
+              leftSection={<IconRocket size={16} />}
+              onClick={() => (a.source === 'git' ? action.mutate('deploy') : setUploading(true))}
+              loading={action.isPending && action.variables === 'deploy'}
+            >
+              Deploy
+            </Button>
             {running ? (
               <>
                 <Button
@@ -166,6 +171,9 @@ export function AppPage() {
           <AppSettings app={a} />
         </Tabs.Panel>
       </Tabs>
+      <Modal opened={uploading} onClose={() => setUploading(false)} title={`Deploy ${a.name}`} size="lg">
+        <UploadBundle app={a} />
+      </Modal>
     </Stack>
   );
 }
