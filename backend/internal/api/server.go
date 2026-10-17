@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -58,9 +59,53 @@ func New(deps *Deps) *Server {
 	return s
 }
 
+// ServeHTTP turns a panic in any handler into a logged 500 instead of a dropped connection.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mux.ServeHTTP(w, r)
+	tw := &trackingWriter{ResponseWriter: w}
+	defer func() {
+		v := recover()
+		if v == nil || v == http.ErrAbortHandler {
+			if v != nil {
+				panic(v)
+			}
+			return
+		}
+		slog.Error("api panic", "method", r.Method, "path", r.URL.Path, "panic", v, "stack", string(debug.Stack()))
+		if tw.started {
+			// Part of the response is out (e.g. a log stream); cut the connection so the
+			// client doesn't take it for a complete response.
+			panic(http.ErrAbortHandler)
+		}
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+	}()
+	s.mux.ServeHTTP(tw, r)
 }
+
+// trackingWriter records whether the response has started. It passes Flush through
+// because the log streams check for http.Flusher directly.
+type trackingWriter struct {
+	http.ResponseWriter
+	started bool
+}
+
+func (t *trackingWriter) WriteHeader(code int) {
+	t.started = true
+	t.ResponseWriter.WriteHeader(code)
+}
+
+func (t *trackingWriter) Write(b []byte) (int, error) {
+	t.started = true
+	return t.ResponseWriter.Write(b)
+}
+
+func (t *trackingWriter) Flush() {
+	if f, ok := t.ResponseWriter.(http.Flusher); ok {
+		t.started = true
+		f.Flush()
+	}
+}
+
+func (t *trackingWriter) Unwrap() http.ResponseWriter { return t.ResponseWriter }
 
 func (s *Server) routes() {
 	s.public("GET /api/auth/status", s.authStatus)
