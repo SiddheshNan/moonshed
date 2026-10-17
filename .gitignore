@@ -1,8 +1,9 @@
-dist/
-.dev/
-.dev2/
-frontend/node_modules/
-frontend/dist/
+.DS_Store
+/dist/
+/dist.tmp/
+ui/node_modules/
+ui/dist/
 
-dist/
-runtime/
+# The dev runtime: only its config is committed, the rest is created on first run.
+/runtime/*
+!/runtime/config/

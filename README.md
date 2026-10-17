@@ -32,37 +32,39 @@ Moonshed is a lightweight alternative to platforms like Dokploy, built to run co
 
 ## Install
 
-Needs Go 1.26+ and Node 20+ to build.
+Needs Go 1.26+, Node 20+ and Python 3 to build.
 
 ```bash
-./build.sh
+./scripts/build.py
 ```
 
-This produces a folder per target (default: linux/amd64, linux/arm64, windows/amd64):
+It asks for the version, the target platforms, the output folder and whether to run the tests (Enter accepts the defaults), then writes a bundle per target:
 
 ```
 dist/linux-amd64/
   moonshed
-  runtime/web/      the UI
+  runtime/
+    config/production.yaml
+    web/                      the UI
 ```
 
-Pick targets with `TARGETS="linux/amd64 windows/amd64" ./build.sh`.
-
-Copy the `dist/<os>-<arch>/` folder to your server, then as root / Administrator:
+Copy a bundle to your server, check `runtime/config/production.yaml`, then as root / Administrator:
 
 ```bash
-./moonshed install
+./moonshed install -e production
 ```
 
-This registers a systemd unit (Linux) or a Windows service and starts it on boot. Open `http://<server>:5050` and create the admin account. The rest of `runtime/` (config, database, apps, logs) is created on first run.
+This registers a systemd unit (Linux) or a Windows service and starts it on boot. Open `http://<server>:5050` and create the admin account. The rest of `runtime/` (database, apps, logs, backups) is created on first run.
 
 Other commands:
 
 ```bash
-./moonshed serve                   # run in the foreground
+./moonshed serve -e production     # run in the foreground
 ./moonshed uninstall
 ./moonshed reset-password admin
 ```
+
+`-e` (or `ENV`) picks `runtime/config/<env>.yaml` and is required; Moonshed exits if the file is missing or incomplete. `--runtime` (or `RUNTIME_DIR`) defaults to `runtime/` next to the binary.
 
 ## Deploy an app
 
@@ -91,21 +93,20 @@ Scripts can be one-liners, multi-line blocks, a path to a `.sh`/`.ps1`/`.cmd` fi
 ## Development
 
 ```bash
-cd backend && go run ./cmd/moonshed serve --runtime ../.dev
-cd frontend && npm install && npm run dev     # http://localhost:5173, proxies /api to :5050
+go run ./cmd/moonshed serve -e development
+cd ui && npm install && npm run dev
 ```
 
-```
-backend/    Go server (cmd/moonshed)
-frontend/   React + Mantine UI
-examples/   sample apps
-build.sh    builds dist/<os>-<arch>/ ready to copy to a server
-```
+Open http://localhost:5050. See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and conventions.
 
 ## Docs
 
-[DESIGN.md](DESIGN.md) explains how it works: the bundle format, runtimes, the deploy flow, the proxy, monitoring, backups and the API.
+[DESIGN.md](docs/DESIGN.md) explains how it works: the bundle format, runtimes, the deploy flow, the proxy, monitoring, backups and the API.
 
 ## Contributing
 
-Issues and pull requests are welcome. Moonshed is early, so please open an issue to discuss bigger changes first.
+Issues and pull requests are welcome. Moonshed is early, so please open an issue to discuss bigger changes first. See [CONTRIBUTING.md](CONTRIBUTING.md), and report security issues as described in [SECURITY.md](SECURITY.md).
+
+## License
+
+[AGPL-3.0](LICENSE). You can use, modify and self-host Moonshed freely; if you offer a modified version to others as a network service, you must publish your changes under the same license.

@@ -1,0 +1,16 @@
+# The panel is always served here, whatever the reverse proxy is doing.
+# Use "127.0.0.1:5050" to keep it off the network and reach it only through its domain.
+panel_addr: ":5050"
+
+# Reverse proxy listeners, used once the proxy is turned on in Settings.
+http_addr: ":80"
+https_addr: ":443"
+
+# Builds that may run at the same time. Keep 1 on small servers.
+concurrent_builds: 1
+
+# "/" serves the built UI from runtime/web.
+ui: "/"
+
+# debug, info, warn or error.
+log_level: "info"

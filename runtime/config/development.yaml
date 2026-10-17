@@ -1,0 +1,14 @@
+# The panel is always served here, whatever the reverse proxy is doing.
+panel_addr: ":5050"
+
+# Reverse proxy listeners, used once the proxy is turned on in Settings.
+http_addr: ":80"
+https_addr: ":443"
+
+concurrent_builds: 1
+
+# "/" serves the built UI from runtime/web; a URL forwards to that dev server (npm run dev).
+ui: "http://localhost:5173"
+
+# debug, info, warn or error.
+log_level: "debug"
