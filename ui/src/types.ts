@@ -104,6 +104,7 @@ export interface App {
   health: Health;
   health_check: string;
   deployed: Deployment | null;
+  last_deployment: Deployment | null;
   has_run_as_password: boolean;
   domains: Domain[];
   webhook_secret?: string;
@@ -204,7 +205,7 @@ export interface ProxyStatus {
 
 export interface ServerInfo {
   version: string;
-  stats: ServerStats;
+  stats: ServerStats | null;
   docker: boolean;
   docker_version: string;
   proxy: ProxyStatus;
@@ -216,6 +217,7 @@ export interface SettingsResponse {
   settings: Settings;
   proxy: ProxyStatus;
   panel_addr: string;
+  config_file: string;
   panel_certificate?: CertInfo | null;
   error?: string;
 }
@@ -255,6 +257,8 @@ export interface ProjectSummary extends Project {
 
 export interface DeploymentRow extends Deployment {
   app_name: string;
+  project_id: string;
+  git_url: string;
 }
 
 export interface AuditEntry {

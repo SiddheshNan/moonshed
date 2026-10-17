@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Anchor, Button, Card, Group, SimpleGrid, Stack, Table, Text } from '@mantine/core';
-import { IconCircleCheck, IconPlus } from '@tabler/icons-react';
+import { IconPlus } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router';
 
@@ -8,20 +8,13 @@ import { api } from '../api';
 import { MetricChart, RangePicker } from '../components/Charts';
 import { PageHeader } from '../components/PageHeader';
 import { AppStatusBadge, DeployStatusBadge } from '../components/StatusBadge';
-import { elapsed, formatBytes, formatBytesShort, formatDuration, formatPercent, summarizeError, timeAgo } from '../format';
-import type { App, DeploymentRow, ServerInfo, Series } from '../types';
+import { elapsed, formatBytes, formatBytesShort, formatDuration, formatPercent, timeAgo } from '../format';
+import { appPath } from '../paths';
+import { byProblem } from '../problems';
+import type { App, DeploymentRow, Project, ServerInfo, Series } from '../types';
 import { NewAppModal } from './NewAppModal';
 
-// problem explains what is wrong with an app, or returns null when nothing is.
-function problem(app: App, lastDeploy: DeploymentRow | undefined): string | null {
-  if (app.status.state === 'crashed') {
-    return app.status.restarts > 0 ? `Crashed, restarted ${app.status.restarts} times` : 'Crashed';
-  }
-  if (app.status.state === 'running' && app.health === 'down') return 'Failing its health check';
-  if (app.status.state !== 'running' && app.desired_state === 'running' && app.current_release_id) return 'Stopped unexpectedly';
-  if (lastDeploy?.status === 'failed') return `Last deployment failed${lastDeploy.error ? `: ${summarizeError(lastDeploy.error)}` : ''}`;
-  return null;
-}
+const appLimit = 6;
 
 export function Dashboard() {
   const [range, setRange] = useState('1h');
@@ -29,9 +22,10 @@ export function Dashboard() {
   const navigate = useNavigate();
   const server = useQuery({ queryKey: ['server'], queryFn: () => api.get<ServerInfo>('/server'), refetchInterval: 5000 });
   const apps = useQuery({ queryKey: ['apps'], queryFn: () => api.get<App[]>('/apps'), refetchInterval: 5000 });
+  const projects = useQuery({ queryKey: ['projects-list'], queryFn: () => api.get<Project[]>('/projects') });
   const deployments = useQuery({
     queryKey: ['all-deployments', 'dashboard'],
-    queryFn: () => api.get<DeploymentRow[]>('/deployments?limit=100'),
+    queryFn: () => api.get<DeploymentRow[]>('/deployments?limit=5'),
     refetchInterval: 5000,
   });
   const metrics = useQuery({
@@ -40,15 +34,10 @@ export function Dashboard() {
     refetchInterval: 5000,
   });
 
-  const latest = new Map<string, DeploymentRow>();
-  for (const d of deployments.data ?? []) {
-    if (!latest.has(d.app_id)) latest.set(d.app_id, d);
-  }
   const all = apps.data ?? [];
-  const problems = all.flatMap((app) => {
-    const reason = problem(app, latest.get(app.id));
-    return reason ? [{ app, reason }] : [];
-  });
+  const projectName = new Map(projects.data?.map((p) => [p.id, p.name]));
+  // Apps with a problem come first, so they're never cut off by the limit.
+  const rows = byProblem(all);
   const running = all.filter((a) => a.status.state === 'running').length;
   const s = server.data?.stats;
 
@@ -79,25 +68,22 @@ export function Dashboard() {
               {all.length} total · {running} running
             </Text>
           </Group>
-          {apps.data && problems.length === 0 && (
-            <Group gap="xs" px="lg" pb="lg">
-              <IconCircleCheck size={18} color="var(--mantine-color-green-6)" />
-              <Text size="sm" c="dimmed">
-                {all.length === 0 ? 'No apps yet.' : 'Nothing needs attention.'}
-              </Text>
-            </Group>
+          {apps.data?.length === 0 && (
+            <Text c="dimmed" size="sm" px="lg" pb="lg">
+              No apps yet.
+            </Text>
           )}
-          {problems.length > 0 && (
+          {rows.length > 0 && (
             <Table highlightOnHover>
               <Table.Tbody>
-                {problems.map(({ app, reason }) => (
-                  <Table.Tr key={app.id} className="row-link" onClick={() => navigate(`/apps/${app.id}`)}>
+                {rows.slice(0, appLimit).map(({ app, problem }) => (
+                  <Table.Tr key={app.id} className="row-link" onClick={() => navigate(appPath(app.project_id, app.id))}>
                     <Table.Td maw={0} w="100%">
                       <Text size="sm" fw={500} truncate>
                         {app.name}
                       </Text>
-                      <Text size="xs" c="dimmed" truncate title={reason}>
-                        {reason}
+                      <Text size="xs" c={problem ? 'red' : 'dimmed'} truncate title={problem ?? undefined}>
+                        {problem ?? projectName.get(app.project_id)}
                       </Text>
                     </Table.Td>
                     <Table.Td ta="right">
@@ -107,6 +93,11 @@ export function Dashboard() {
                 ))}
               </Table.Tbody>
             </Table>
+          )}
+          {rows.length > appLimit && (
+            <Anchor component={Link} to="/apps" size="sm" display="block" px="lg" py="sm">
+              View all {rows.length} apps
+            </Anchor>
           )}
         </Card>
 
@@ -125,7 +116,7 @@ export function Dashboard() {
             <Table highlightOnHover>
               <Table.Tbody>
                 {deployments.data?.slice(0, 5).map((d) => (
-                  <Table.Tr key={d.id} className="row-link" onClick={() => navigate(`/apps/${d.app_id}/deployments`)}>
+                  <Table.Tr key={d.id} className="row-link" onClick={() => navigate(appPath(d.project_id, d.app_id, 'deployments'))}>
                     <Table.Td fw={500} className="nowrap">
                       {d.app_name}
                     </Table.Td>

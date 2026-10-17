@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Badge, Box, Group, ScrollArea, Switch, Text } from '@mantine/core';
 
+import { ansi } from './ansi';
+
 const maxLines = 5000;
 
 // LogViewer follows a server-sent events stream of log lines.
@@ -88,7 +90,7 @@ function LogLine({ line }: { line: string }) {
       <Text span inherit c="#5d5f68" fw={400} mr="md">
         {time}
       </Text>
-      {platform ? text.slice(4) : text}
+      {ansi(platform ? text.slice(4) : text)}
     </Text>
   );
 }

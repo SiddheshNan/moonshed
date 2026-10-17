@@ -37,21 +37,23 @@ export function Section({
   saveDisabled?: boolean;
 }) {
   return (
-    <Card padding="lg">
-      <Text fw={600}>{title}</Text>
-      {description && (
-        <Text size="sm" c="dimmed">
-          {description}
-        </Text>
-      )}
-      <Stack mt="md">{children}</Stack>
-      {onSave && (
-        <Group justify="flex-end" mt="md">
+    <Card padding={0}>
+      <Group className="panel-header" justify="space-between" wrap="nowrap">
+        <div>
+          <Text fw={600}>{title}</Text>
+          {description && (
+            <Text size="sm" c="dimmed">
+              {description}
+            </Text>
+          )}
+        </div>
+        {onSave && (
           <Button size="sm" onClick={onSave} loading={saving} disabled={saveDisabled}>
             Save
           </Button>
-        </Group>
-      )}
+        )}
+      </Group>
+      <Stack p="lg">{children}</Stack>
     </Card>
   );
 }
@@ -70,7 +72,6 @@ function General({ app }: { app: App }) {
   const projects = useQuery({ queryKey: ['projects-list'], queryFn: () => api.get<Project[]>('/projects') });
   const [form, setForm] = useState({
     project_id: app.project_id,
-    port: app.port,
     runtime: app.runtime,
     keep_bundles: app.keep_bundles,
     log_retention_days: app.log_retention_days,
@@ -88,14 +89,6 @@ function General({ app }: { app: App }) {
         onChange={(v) => v && set('project_id', v)}
         allowDeselect={false}
       />
-      <NumberInput
-        label="Port"
-        description="The port the app listens on, passed as $PORT. Used for domains and health checks. Takes effect on the next start."
-        min={1}
-        max={65535}
-        value={form.port || ''}
-        onChange={(v) => set('port', Number(v) || 0)}
-      />
       {!app.current_release_id && (
         <Stack gap={6}>
           <Text size="sm" fw={500}>
@@ -112,7 +105,7 @@ function General({ app }: { app: App }) {
             ]}
           />
           <Text size="xs" c="dimmed">
-            Detection picks native when app.yaml has a run script, otherwise Docker when there is a Dockerfile. Fixed after the first deploy.
+            Can't be changed after the first deploy.
           </Text>
         </Stack>
       )}
@@ -127,7 +120,7 @@ function General({ app }: { app: App }) {
 
 function RunAs({ app }: { app: App }) {
   const server = useQuery({ queryKey: ['server'], queryFn: () => api.get<ServerInfo>('/server') });
-  const windows = server.data?.stats.os === 'windows';
+  const windows = server.data?.stats?.os === 'windows';
   const [user, setUser] = useState(app.run_as_user);
   const [password, setPassword] = useState('');
   const save = useSave(app);
@@ -135,7 +128,7 @@ function RunAs({ app }: { app: App }) {
   return (
     <Section
       title="Run as OS user"
-      description="Run the app and its scripts as this user instead of the platform's service account. The user must already exist."
+      description="Runs the app and its scripts as an existing OS user instead of Moonshed's service account."
       onSave={() => save.mutate({ run_as_user: user, ...(password ? { run_as_password: password } : {}) }, { onSuccess: () => setPassword('') })}
       saving={save.isPending}
     >

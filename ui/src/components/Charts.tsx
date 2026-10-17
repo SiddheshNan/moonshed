@@ -1,7 +1,7 @@
 import { AreaChart } from '@mantine/charts';
 import { Card, Group, Progress, SegmentedControl, Stack, Text, Tooltip } from '@mantine/core';
 
-import { formatDateTime } from '../format';
+import { formatDateTime, timeAgo } from '../format';
 import type { Point, Series } from '../types';
 
 export const ranges = ['1m', '5m', '15m', '30m', '1h', '6h', '12h', '24h', '48h', '7d'].map((r) => ({ value: r, label: r }));
@@ -22,7 +22,7 @@ function timeLabel(t: number, range: string): string {
 }
 
 // merge lines up the series by timestamp. Gauges also carry their bucket peak as "<key>_max".
-function merge(series: Series, keys: ChartSeries[], range: string) {
+function merge(series: Series, keys: ChartSeries[]) {
   const rows = new Map<number, Record<string, number | string>>();
   for (const { key } of keys) {
     for (const p of series[key] ?? ([] as Point[])) {
@@ -32,9 +32,7 @@ function merge(series: Series, keys: ChartSeries[], range: string) {
       rows.set(p.t, row);
     }
   }
-  return [...rows.values()]
-    .sort((a, b) => (a.t as number) - (b.t as number))
-    .map((row) => ({ ...row, time: timeLabel(row.t as number, range) }));
+  return [...rows.values()].sort((a, b) => (a.t as number) - (b.t as number));
 }
 
 export function MetricChart({
@@ -58,7 +56,7 @@ export function MetricChart({
   detail?: string;
   axisFormat?: (v: number) => string;
 }) {
-  const data = series ? merge(series, keys, range) : [];
+  const data = series ? merge(series, keys) : [];
   const lines = keys.map((k) => ({ name: k.key, label: k.label, color: k.color }));
   if (peak) {
     for (const k of keys) {
@@ -96,7 +94,7 @@ export function MetricChart({
         <AreaChart
           h={180}
           data={data}
-          dataKey="time"
+          dataKey="t"
           series={lines}
           curveType="monotone"
           withDots={false}
@@ -107,9 +105,17 @@ export function MetricChart({
           textColor="var(--mantine-color-dimmed)"
           valueFormatter={format}
           yAxisProps={{ width: 76, tickFormatter: axisFormat ?? format }}
-          xAxisProps={{ minTickGap: 40 }}
+          // A time axis, so ticks are evenly spaced in time and gaps without data stay visible.
+          xAxisProps={{
+            type: 'number',
+            scale: 'time',
+            domain: ['dataMin', 'dataMax'],
+            tickFormatter: (t: number) => timeLabel(t, range),
+            minTickGap: 40,
+          }}
+          tooltipProps={{ labelFormatter: (t) => timeLabel(Number(t), range) }}
           gridAxis="y"
-          withLegend={keys.length > 1}
+          withLegend={keys.length > 1 || peak}
           connectNulls={false}
         />
       )}
@@ -158,7 +164,7 @@ export function UptimeBars({ bars, start, span }: { bars: (number | null)[]; sta
       </Group>
       <Group justify="space-between">
         <Text size="xs" c="dimmed">
-          {fmt(from)}
+          {timeAgo(new Date(from).toISOString())}
         </Text>
         <Text size="xs" c="dimmed">
           Now

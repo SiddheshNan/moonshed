@@ -7,8 +7,6 @@ import {
   Button,
   Card,
   Group,
-  Modal,
-  PasswordInput,
   Stack,
   Table,
   Text,
@@ -22,6 +20,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
 
 import { api, queryClient } from '../../api';
+import { CredentialModal } from '../../components/CredentialModal';
 import { PageHeader } from '../../components/PageHeader';
 import { timeAgo } from '../../format';
 import type { GitCredential, GitOverview } from '../../types';
@@ -33,11 +32,7 @@ export function GitSettingsPage() {
 
   return (
     <Stack gap="lg" maw={960}>
-      <PageHeader
-        crumbs={[{ label: 'Settings' }]}
-        title="Git"
-        description="Connect GitHub with a GitHub App, or save access tokens for any other git host."
-      />
+      <PageHeader crumbs={[{ label: 'Settings' }]} title="Git" />
       {error && (
         <Alert color="red" variant="light" withCloseButton onClose={() => setParams({})} title="GitHub setup failed">
           {error}
@@ -94,8 +89,7 @@ function GitHubApps({ data }: { data: GitOverview | undefined }) {
             <Text fw={600}>GitHub</Text>
           </Group>
           <Text size="sm" c="dimmed">
-            Creates a private GitHub App owned by you, then you install it on the accounts or repos you want to deploy. Private repos
-            work without tokens and pushes trigger deployments. GitHub must be able to reach this panel over HTTPS for push webhooks.
+            Deploy private repositories without tokens, and on every push. GitHub must reach this panel over HTTPS.
           </Text>
         </div>
 
@@ -167,7 +161,6 @@ function GitHubApps({ data }: { data: GitOverview | undefined }) {
         <Group align="flex-end">
           <TextInput
             label="Organization (optional)"
-            description="Leave empty to create the app on your personal account"
             placeholder="my-org"
             value={org}
             onChange={(e) => setOrg(e.currentTarget.value)}
@@ -182,12 +175,6 @@ function GitHubApps({ data }: { data: GitOverview | undefined }) {
   );
 }
 
-const hostHints: Record<string, string> = {
-  'gitlab.com': 'oauth2',
-  'github.com': 'x-access-token',
-  'bitbucket.org': 'x-token-auth',
-};
-
 function Credentials({ credentials }: { credentials: GitCredential[] }) {
   const [editing, setEditing] = useState<GitCredential | 'new' | null>(null);
   const remove = useMutation({
@@ -201,7 +188,7 @@ function Credentials({ credentials }: { credentials: GitCredential[] }) {
         <div>
           <Text fw={600}>Access tokens</Text>
           <Text size="sm" c="dimmed">
-            For private repos on GitLab, Bitbucket, Gitea or anywhere else. Apps pick one of these when they use a Git URL.
+            For private repositories outside the GitHub App: GitLab, Bitbucket, Gitea and others.
           </Text>
         </div>
         <Button variant="default" leftSection={<IconPlus size={16} />} onClick={() => setEditing('new')}>
@@ -254,81 +241,5 @@ function Credentials({ credentials }: { credentials: GitCredential[] }) {
       )}
       <CredentialModal credential={editing} onClose={() => setEditing(null)} />
     </Card>
-  );
-}
-
-function CredentialModal({ credential, onClose }: { credential: GitCredential | 'new' | null; onClose: () => void }) {
-  const isNew = credential === 'new';
-  const [form, setForm] = useState({ name: '', host: 'gitlab.com', username: 'oauth2', token: '' });
-  const [loaded, setLoaded] = useState<GitCredential | 'new' | null>(null);
-  if (credential !== loaded) {
-    setLoaded(credential);
-    setForm(
-      credential && credential !== 'new'
-        ? { name: credential.name, host: credential.host, username: credential.username, token: '' }
-        : { name: '', host: 'gitlab.com', username: 'oauth2', token: '' },
-    );
-  }
-  const save = useMutation({
-    mutationFn: () => {
-      const body = { ...form, token: form.token || null };
-      return isNew ? api.post('/git/credentials', body) : api.put(`/git/credentials/${(credential as GitCredential).id}`, body);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['git'] });
-      onClose();
-    },
-  });
-
-  return (
-    <Modal opened={credential !== null} onClose={onClose} title={isNew ? 'Add access token' : 'Edit access token'}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          save.mutate();
-        }}
-      >
-        <Stack>
-          {save.error && (
-            <Alert color="red" variant="light">
-              {save.error.message}
-            </Alert>
-          )}
-          <TextInput label="Name" placeholder="GitLab work" value={form.name} onChange={(e) => setForm({ ...form, name: e.currentTarget.value })} required data-autofocus />
-          <TextInput
-            label="Host"
-            value={form.host}
-            onChange={(e) => {
-              const host = e.currentTarget.value;
-              setForm({ ...form, host, username: hostHints[host] ?? form.username });
-            }}
-            required
-          />
-          <TextInput
-            label="Username"
-            description="GitLab: oauth2 · GitHub: x-access-token · Bitbucket: x-token-auth · others: your username"
-            value={form.username}
-            onChange={(e) => setForm({ ...form, username: e.currentTarget.value })}
-            required
-          />
-          <PasswordInput
-            label="Token"
-            description="Read access to repositories is enough"
-            placeholder={isNew ? '' : '•••••••• (unchanged)'}
-            value={form.token}
-            onChange={(e) => setForm({ ...form, token: e.currentTarget.value })}
-            required={isNew}
-          />
-          <Group justify="flex-end">
-            <Button variant="default" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" loading={save.isPending}>
-              Save
-            </Button>
-          </Group>
-        </Stack>
-      </form>
-    </Modal>
   );
 }

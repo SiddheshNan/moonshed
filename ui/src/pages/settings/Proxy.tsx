@@ -63,7 +63,7 @@ export function ProxySettingsPage() {
 
   return (
     <Stack gap="lg" maw={960}>
-      <PageHeader crumbs={[{ label: 'Settings' }]} title="Proxy" description="The built-in reverse proxy (Caddy): HTTPS, trusted proxies and raw Caddyfile." />
+      <PageHeader crumbs={[{ label: 'Settings' }]} title="Proxy" />
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -77,7 +77,7 @@ export function ProxySettingsPage() {
                 <div>
                   <Text fw={600}>Reverse proxy</Text>
                   <Text size="sm" c="dimmed">
-                    Routes app domains and handles HTTPS on {proxy.http_addr} and {proxy.https_addr} (set in config.yaml).
+                    Listens on {proxy.http_addr} and {proxy.https_addr}, set in <Code>{query.data.config_file}</Code>.
                   </Text>
                 </div>
                 <Button variant="default" onClick={() => setViewing(true)}>
@@ -91,8 +91,8 @@ export function ProxySettingsPage() {
               )}
               <Switch label={proxy.listening ? 'Enabled (listening)' : 'Enabled'} checked={form.proxy_enabled} onChange={(e) => set({ proxy_enabled: e.currentTarget.checked })} />
               <TextInput
-                label="Let's Encrypt email"
-                description="Used for expiry notices from Let's Encrypt (optional)"
+                label="Let's Encrypt email (optional)"
+                placeholder="you@example.com"
                 value={form.acme_email}
                 onChange={(e) => set({ acme_email: e.currentTarget.value })}
                 maw={420}
@@ -105,8 +105,8 @@ export function ProxySettingsPage() {
               <div>
                 <Text fw={600}>Trusted proxies</Text>
                 <Text size="sm" c="dimmed">
-                  If traffic reaches this server through Cloudflare, a load balancer or another proxy, list it here. Moonshed then takes the visitor's IP from{' '}
-                  <Code>X-Forwarded-For</Code> for IP allow lists and the request log. Don't list anything you don't control.
+                  Proxies in front of this server, like Cloudflare or a load balancer. Their <Code>X-Forwarded-For</Code> is trusted for the visitor's IP. Only
+                  list ones you control.
                 </Text>
               </div>
               <Checkbox
@@ -145,8 +145,7 @@ export function ProxySettingsPage() {
               <div>
                 <Text fw={600}>Advanced</Text>
                 <Text size="sm" c="dimmed">
-                  Raw Caddyfile, for anything the UI doesn't cover. Per-domain directives go in each domain's Advanced tab. Saving checks the whole config
-                  first; if a stored snippet ever fails at startup, the proxy runs without the advanced config and shows the error above.
+                  Raw Caddyfile for anything the UI doesn't cover. If it ever breaks the config, the proxy runs without it and shows the error.
                 </Text>
               </div>
               <Textarea
@@ -168,7 +167,7 @@ export function ProxySettingsPage() {
               />
               <Textarea
                 label="Extra sites"
-                description="Whole site blocks added to the end of the Caddyfile, e.g. a redirect domain or a static site."
+                description="Site blocks appended to the Caddyfile."
                 placeholder={'old.example.com {\n\tredir https://example.com{uri} permanent\n}'}
                 autosize
                 minRows={6}

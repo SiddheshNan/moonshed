@@ -7,6 +7,7 @@ import { Link } from 'react-router';
 import { api } from '../../api';
 import { PageHeader } from '../../components/PageHeader';
 import { formatDateTime, timeAgo } from '../../format';
+import { appPath } from '../../paths';
 import type { App, AuditEntry } from '../../types';
 
 const pageSize = 50;
@@ -66,6 +67,8 @@ const actionLabels: Record<string, string> = {
   'token.delete': 'Deleted API token',
 };
 
+const actorLabels: Record<AuditEntry['actor_type'], string> = { user: 'User', token: 'API token', webhook: 'Webhook', system: 'System' };
+
 const actorColors: Record<AuditEntry['actor_type'], string> = { user: 'gray', token: 'blue', webhook: 'grape', system: 'gray' };
 
 export function AuditPage() {
@@ -84,12 +87,12 @@ export function AuditPage() {
     getNextPageParam: (last) => (last.length === pageSize ? last[last.length - 1].seq : undefined),
   });
   const apps = useQuery({ queryKey: ['apps'], queryFn: () => api.get<App[]>('/apps') });
-  const appIds = new Set(apps.data?.map((a) => a.id));
+  const appsById = new Map(apps.data?.map((a) => [a.id, a]));
   const rows = list.data?.pages.flat() ?? [];
 
   return (
     <Stack gap="lg">
-      <PageHeader crumbs={[{ label: 'Settings' }]} title="Audit log" description="Who did what, and when. Kept for one year." />
+      <PageHeader crumbs={[{ label: 'Settings' }]} title="Audit log" description="Kept for one year." />
       <Group>
         <Select placeholder="Everything" data={areas} value={action} onChange={setAction} clearable w={200} />
         <TextInput placeholder="Username" leftSection={<IconSearch size={16} />} value={actor} onChange={(e) => setActor(e.currentTarget.value.trim())} w={220} />
@@ -108,47 +111,50 @@ export function AuditPage() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {rows.map((e) => (
-                <Table.Tr key={e.seq}>
-                  <Table.Td style={{ whiteSpace: 'nowrap' }}>
-                    <Tooltip label={formatDateTime(e.time)}>
-                      <Text size="sm">{timeAgo(e.time)}</Text>
-                    </Tooltip>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap={6} wrap="nowrap">
-                      <Text size="sm" fw={500}>
-                        {e.actor_name}
+              {rows.map((e) => {
+                const target = e.target_type === 'app' ? appsById.get(e.target_id) : undefined;
+                return (
+                  <Table.Tr key={e.seq}>
+                    <Table.Td style={{ whiteSpace: 'nowrap' }}>
+                      <Tooltip label={formatDateTime(e.time)}>
+                        <Text size="sm">{timeAgo(e.time)}</Text>
+                      </Tooltip>
+                    </Table.Td>
+                    <Table.Td className="nowrap">
+                      <Group gap={6} wrap="nowrap">
+                        <Text size="sm" fw={500}>
+                          {e.actor_name}
+                        </Text>
+                        {e.actor_type !== 'user' && (
+                          <Badge size="xs" color={actorColors[e.actor_type]}>
+                            {actorLabels[e.actor_type]}
+                          </Badge>
+                        )}
+                      </Group>
+                    </Table.Td>
+                    <Table.Td className="nowrap">
+                      <Text size="sm" c={e.action.endsWith('failed') ? 'red' : undefined} title={e.action}>
+                        {actionLabels[e.action] ?? e.action}
                       </Text>
-                      {e.actor_type !== 'user' && (
-                        <Badge size="xs" color={actorColors[e.actor_type]}>
-                          {e.actor_type}
-                        </Badge>
+                    </Table.Td>
+                    <Table.Td className="nowrap">
+                      {target ? (
+                        <Text component={Link} to={appPath(target.project_id, target.id)} size="sm" c="indigo">
+                          {e.target_name}
+                        </Text>
+                      ) : (
+                        <Text size="sm">{e.target_name || '—'}</Text>
                       )}
-                    </Group>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" c={e.action.endsWith('failed') ? 'red' : undefined} title={e.action}>
-                      {actionLabels[e.action] ?? e.action}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    {e.target_type === 'app' && appIds.has(e.target_id) ? (
-                      <Text component={Link} to={`/apps/${e.target_id}`} size="sm" c="indigo">
-                        {e.target_name}
+                    </Table.Td>
+                    <Table.Td maw={360}>
+                      <Text size="sm" c="dimmed" lineClamp={2}>
+                        {e.details || '—'}
                       </Text>
-                    ) : (
-                      <Text size="sm">{e.target_name || '—'}</Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td maw={360}>
-                    <Text size="sm" c="dimmed" lineClamp={2}>
-                      {e.details || '—'}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td c="dimmed">{e.ip}</Table.Td>
-                </Table.Tr>
-              ))}
+                    </Table.Td>
+                    <Table.Td c="dimmed">{e.ip}</Table.Td>
+                  </Table.Tr>
+                );
+              })}
             </Table.Tbody>
           </Table>
         </Table.ScrollContainer>

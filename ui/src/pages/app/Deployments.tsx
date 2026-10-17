@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { ActionIcon, Badge, Button, Card, Code, Drawer, Group, Stack, Table, Text, Tooltip } from '@mantine/core';
+import { Badge, Button, Card, Code, Drawer, Group, Stack, Table, Text } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
-import { IconFileText, IconPlayerStop } from '@tabler/icons-react';
+import { IconFileText, IconPlayerStop, IconRotateClockwise } from '@tabler/icons-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { api, queryClient } from '../../api';
+import { Commit } from '../../components/Commit';
 import { LogViewer } from '../../components/LogViewer';
 import { DeployStatusBadge, isActive } from '../../components/StatusBadge';
-import { elapsed, formatDateTime, summarizeError, timeAgo } from '../../format';
+import { elapsed, formatDateTime, summarizeError, timeAgo, triggerLabel } from '../../format';
 import type { App, Bundle, Deployment } from '../../types';
 
 export function Deployments({ app }: { app: App }) {
@@ -62,7 +63,7 @@ export function Deployments({ app }: { app: App }) {
             The last {app.keep_bundles} versions can be redeployed
           </Text>
         </Group>
-        <Table.ScrollContainer minWidth={680}>
+        <Table.ScrollContainer minWidth={820}>
           <Table verticalSpacing="sm">
             <Table.Thead>
               <Table.Tr>
@@ -84,7 +85,7 @@ export function Deployments({ app }: { app: App }) {
                         <DeployStatusBadge status={d.status} />
                         {live && (
                           <Badge size="sm" variant="light" color="green">
-                            live
+                            Live
                           </Badge>
                         )}
                       </Group>
@@ -96,39 +97,33 @@ export function Deployments({ app }: { app: App }) {
                     </Table.Td>
                     <Table.Td>
                       {d.git_commit ? (
-                        <Tooltip label={d.git_message || d.git_commit} disabled={!d.git_message}>
-                          <Code>{d.git_commit.slice(0, 7)}</Code>
-                        </Tooltip>
+                        <Commit gitUrl={app.git_url} sha={d.git_commit} message={d.git_message} />
                       ) : d.bundle_id ? (
-                        'upload'
+                        'Zip upload'
                       ) : (
                         '—'
                       )}
                     </Table.Td>
-                    <Table.Td>{d.trigger}</Table.Td>
+                    <Table.Td className="nowrap">{triggerLabel(d.trigger)}</Table.Td>
                     <Table.Td className="nowrap" title={formatDateTime(d.created_at)}>
                       {timeAgo(d.created_at)}
                     </Table.Td>
-                    <Table.Td>{elapsed(d.started_at, d.finished_at)}</Table.Td>
+                    <Table.Td className="nowrap">{elapsed(d.started_at, d.finished_at)}</Table.Td>
                     <Table.Td>
-                      <Group gap={4} justify="flex-end" wrap="nowrap">
+                      <Group gap="xs" justify="flex-end" wrap="nowrap">
                         {d.status === 'success' && !live && stored.has(d.bundle_id) && (
-                          <Button size="compact-xs" variant="default" onClick={() => confirmRedeploy(d)}>
+                          <Button size="compact-sm" variant="default" leftSection={<IconRotateClockwise size={14} />} onClick={() => confirmRedeploy(d)}>
                             Redeploy
                           </Button>
                         )}
                         {isActive(d.status) && (
-                          <Tooltip label="Kill">
-                            <ActionIcon variant="subtle" color="red" onClick={() => kill.mutate(d.id)}>
-                              <IconPlayerStop size={16} />
-                            </ActionIcon>
-                          </Tooltip>
+                          <Button size="compact-sm" variant="light" color="red" leftSection={<IconPlayerStop size={14} />} onClick={() => kill.mutate(d.id)}>
+                            Kill build
+                          </Button>
                         )}
-                        <Tooltip label="View log">
-                          <ActionIcon variant="subtle" color="gray" onClick={() => setViewing(d)}>
-                            <IconFileText size={16} />
-                          </ActionIcon>
-                        </Tooltip>
+                        <Button size="compact-sm" variant="default" leftSection={<IconFileText size={14} />} onClick={() => setViewing(d)}>
+                          View log
+                        </Button>
                       </Group>
                     </Table.Td>
                   </Table.Tr>

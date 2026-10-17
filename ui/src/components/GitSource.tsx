@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Anchor, Group, Select, Stack, Switch, Text, TextInput } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 
 import { api } from '../api';
+import { CredentialModal } from './CredentialModal';
 import type { App, GitOverview, Repo } from '../types';
 
 export interface GitSourceValue {
@@ -48,13 +50,37 @@ export function gitSourceFields(v: GitSourceValue) {
   };
 }
 
+const addToken = '__add';
+
+function hostOf(url: string): string | undefined {
+  const m = url.trim().match(/^(?:https?:\/\/(?:[^@/]+@)?|[^@]+@)([^/:]+)/);
+  return m?.[1].toLowerCase();
+}
+
 export function gitSourceReady(v: GitSourceValue): boolean {
   return v.provider === 'github' ? !!(v.installation && v.repo && v.branch) : !!(v.gitURL && v.branch);
 }
 
 // GitSourceFields edits a repository source. The provider (GitHub App or any git URL) is chosen by the caller.
-export function GitSourceFields({ value, onChange }: { value: GitSourceValue; onChange: (v: GitSourceValue) => void }) {
+// webhookShown says the caller already shows the webhook URL and secret, so the switch needn't mention them.
+// onDialog reports when the "Add token" dialog opens or closes, so a surrounding modal can ignore Escape meanwhile.
+export function GitSourceFields({
+  value,
+  onChange,
+  webhookShown = false,
+  onDialog,
+}: {
+  value: GitSourceValue;
+  onChange: (v: GitSourceValue) => void;
+  webhookShown?: boolean;
+  onDialog?: (open: boolean) => void;
+}) {
   const set = (patch: Partial<GitSourceValue>) => onChange({ ...value, ...patch });
+  const [adding, setAddingState] = useState(false);
+  const setAdding = (open: boolean) => {
+    setAddingState(open);
+    onDialog?.(open);
+  };
   const git = useQuery({ queryKey: ['git'], queryFn: () => api.get<GitOverview>('/git') });
   const installs = git.data?.github_installations ?? [];
   const installation = value.installation || (installs.length === 1 ? installs[0].id : 0);
@@ -69,9 +95,15 @@ export function GitSourceFields({ value, onChange }: { value: GitSourceValue; on
     enabled: value.provider === 'github' && installation > 0 && !!value.repo,
   });
 
+  // The GitHub App delivers pushes itself; any other host needs a webhook added in the repository.
   const autodeploy = (
     <Switch
       label="Deploy automatically on every push"
+      description={
+        value.provider === 'git' && value.autodeploy && !webhookShown
+          ? 'This will need a webhook setup on your repository. Please save to proceed.'
+          : undefined
+      }
       checked={value.autodeploy}
       onChange={(e) => set({ autodeploy: e.currentTarget.checked })}
     />
@@ -123,7 +155,7 @@ export function GitSourceFields({ value, onChange }: { value: GitSourceValue; on
             onChange={(v) => set({ branch: v ?? '' })}
             allowDeselect={false}
           />
-          <TextInput label="Folder" placeholder="repository root" value={value.subdir} onChange={(e) => set({ subdir: e.currentTarget.value })} />
+          <TextInput label="Folder (optional)" placeholder="/" value={value.subdir} onChange={(e) => set({ subdir: e.currentTarget.value })} />
         </Group>
         {autodeploy}
       </Stack>
@@ -134,31 +166,30 @@ export function GitSourceFields({ value, onChange }: { value: GitSourceValue; on
     <Stack gap="sm">
       <TextInput
         label="Repository URL"
-        placeholder="https://gitlab.com/you/app.git"
+        placeholder="https://gitlab.com/username/app.git"
         value={value.gitURL}
         onChange={(e) => set({ gitURL: e.currentTarget.value })}
       />
       <Select
         label="Access token"
-        description={
-          <>
-            For private repositories. Add tokens in{' '}
-            <Anchor component={Link} to="/settings/git" size="xs">
-              Settings › Git
-            </Anchor>
-          </>
-        }
         data={[
           { value: '', label: 'None (public repository)' },
           ...(git.data?.credentials ?? []).map((c) => ({ value: c.id, label: `${c.name} · ${c.host}` })),
+          { value: addToken, label: 'Add token…' },
         ]}
         value={value.credential}
-        onChange={(v) => set({ credential: v ?? '' })}
+        onChange={(v) => (v === addToken ? setAdding(true) : set({ credential: v ?? '' }))}
         allowDeselect={false}
+      />
+      <CredentialModal
+        credential={adding ? 'new' : null}
+        host={hostOf(value.gitURL)}
+        onClose={() => setAdding(false)}
+        onSaved={(c) => set({ credential: c.id })}
       />
       <Group grow align="flex-start">
         <TextInput label="Branch" value={value.branch} onChange={(e) => set({ branch: e.currentTarget.value })} />
-        <TextInput label="Folder" placeholder="repository root" value={value.subdir} onChange={(e) => set({ subdir: e.currentTarget.value })} />
+        <TextInput label="Folder (optional)" placeholder="/" value={value.subdir} onChange={(e) => set({ subdir: e.currentTarget.value })} />
       </Group>
       {autodeploy}
     </Stack>

@@ -56,11 +56,13 @@ export function CertificateFields({ value, onChange }: { value: CertificateValue
   );
 }
 
-export function CertificateSummary({ cert }: { cert: CertInfo | null | undefined }) {
+// CertificateSummary shows expiry; missing replaces the "No certificate uploaded" warning,
+// e.g. for a Let's Encrypt certificate that simply hasn't been issued yet.
+export function CertificateSummary({ cert, missing }: { cert: CertInfo | null | undefined; missing?: string }) {
   if (!cert) {
     return (
-      <Text size="xs" c="red">
-        No certificate uploaded
+      <Text size="xs" c={missing ? 'dimmed' : 'red'}>
+        {missing ?? 'No certificate uploaded'}
       </Text>
     );
   }

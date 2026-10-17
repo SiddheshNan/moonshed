@@ -37,12 +37,11 @@ export function TLSPicker({ value, onChange, disabled }: { value: TLSMode; onCha
               { value: 'custom', label: 'Custom certificate' },
             ]}
           />
-          <Text size="xs" c="dimmed">
-            {value === 'letsencrypt'
-              ? 'Issued and renewed automatically. Needs ports 80 and 443 reachable from the internet.'
-              : 'Upload your own certificate and key, or a PFX.'}{' '}
-            HTTP requests are redirected to HTTPS.
-          </Text>
+          {value === 'letsencrypt' && (
+            <Text size="xs" c="dimmed">
+              Needs the domain's DNS pointing here and ports 80 and 443 open.
+            </Text>
+          )}
         </>
       )}
     </Stack>

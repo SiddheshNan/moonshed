@@ -4,6 +4,7 @@ import { IconDownload } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 
 import { api } from '../../api';
+import { ansi } from '../../components/ansi';
 import { LogViewer } from '../../components/LogViewer';
 import type { App } from '../../types';
 
@@ -48,7 +49,7 @@ export function Logs({ app }: { app: App }) {
         ) : (
           <ScrollArea h={560} className="terminal" p="md">
             <Text component="pre" ff="monospace" fz="xs" m={0} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-              {history.isPending ? 'Loading…' : history.data || 'No logs for this day.'}
+              {history.isPending ? 'Loading…' : history.data ? ansi(history.data) : 'No logs for this day.'}
             </Text>
           </ScrollArea>
         )}

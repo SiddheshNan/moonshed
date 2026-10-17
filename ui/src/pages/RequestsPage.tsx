@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Anchor, Badge, Button, Card, Code, Group, MultiSelect, Select, Stack, Table, Text, TextInput, Tooltip } from '@mantine/core';
+import { Badge, Button, Card, Code, Group, MultiSelect, Select, Stack, Table, Text, TextInput, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { IconPlayerRecord, IconPlayerStop, IconSearch } from '@tabler/icons-react';
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router';
 
 import { api, queryClient } from '../api';
 import { PageHeader } from '../components/PageHeader';
+import { ProxyOff } from '../components/ProxyOff';
 import { formatBytes, formatDateTime } from '../format';
 import type { App, RecordingStatus, RequestEntry } from '../types';
 
@@ -70,7 +70,7 @@ export function RequestsPage() {
 
   return (
     <Stack gap="lg">
-      <PageHeader title="Requests" description="Record requests that pass through the reverse proxy, to debug an app." />
+      <PageHeader title="Requests" />
 
       <Card padding="lg">
         <Stack gap="sm">
@@ -81,11 +81,10 @@ export function RequestsPage() {
                 <Badge color={active ? 'red' : 'gray'}>{active ? 'Recording' : 'Off'}</Badge>
               </Group>
               <Text size="sm" c="dimmed">
-                Only the apps you pick are recorded, up to the last {recording.data?.cap.toLocaleString() ?? '100,000'} requests each. Turning
-                recording off deletes everything recorded.
+                Keeps the last {recording.data?.cap.toLocaleString() ?? '100,000'} requests per app. Stopping deletes everything recorded.
               </Text>
             </div>
-            {active ? (
+            {active && (
               <Button
                 color="red"
                 variant="light"
@@ -102,7 +101,21 @@ export function RequestsPage() {
               >
                 Stop
               </Button>
-            ) : (
+            )}
+          </Group>
+          {proxyOff && <ProxyOff>Requests are recorded by the reverse proxy, which is off.</ProxyOff>}
+          <Group align="flex-end">
+            <MultiSelect
+              label="Apps to record"
+              placeholder="Pick apps"
+              data={appOptions}
+              value={selected}
+              onChange={setSelected}
+              searchable
+              disabled={proxyOff}
+              style={{ flex: 1 }}
+            />
+            {!active && (
               <Button
                 leftSection={<IconPlayerRecord size={16} />}
                 disabled={selected.length === 0 || proxyOff}
@@ -112,26 +125,6 @@ export function RequestsPage() {
                 Start recording
               </Button>
             )}
-          </Group>
-          {proxyOff && (
-            <Text size="sm" c="dimmed">
-              The reverse proxy is off, so there is nothing to record.{' '}
-              <Anchor component={Link} to="/settings" size="sm">
-                Turn it on
-              </Anchor>{' '}
-              first.
-            </Text>
-          )}
-          <Group align="flex-end">
-            <MultiSelect
-              label="Apps to record"
-              placeholder="Pick apps"
-              data={appOptions}
-              value={selected}
-              onChange={setSelected}
-              searchable
-              style={{ flex: 1 }}
-            />
             {changed && (
               <Button variant="default" onClick={() => setRecording.mutate(selected)} loading={setRecording.isPending}>
                 Update apps

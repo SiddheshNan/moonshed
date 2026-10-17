@@ -68,7 +68,15 @@ function Users() {
         <Table.Tbody>
           {users.data?.map((u) => (
             <Table.Tr key={u.id}>
-              <Table.Td fw={500}>{u.username}</Table.Td>
+              <Table.Td fw={500}>
+                {u.username}
+                {u.id === me.data?.user?.id && (
+                  <Text span c="dimmed" fw={400} size="sm">
+                    {' '}
+                    (you)
+                  </Text>
+                )}
+              </Table.Td>
               <Table.Td c="dimmed">added {timeAgo(u.created_at)}</Table.Td>
               <Table.Td>
                 <Group gap="xs" justify="flex-end">

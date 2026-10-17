@@ -5,15 +5,13 @@ import { useNavigate } from 'react-router';
 
 import { api, queryClient } from '../api';
 import { emptyGitSource, gitSourceFields, GitSourceFields, gitSourceReady, type GitSourceValue } from '../components/GitSource';
+import { appPath } from '../paths';
 import type { App, Project } from '../types';
+import { ProjectModal } from './Projects';
 
 type SourceChoice = 'upload' | 'github' | 'git';
 
-const sourceHelp: Record<SourceChoice, string> = {
-  upload: 'Upload a zip from the app page or from CI.',
-  github: 'Pick a repository from your connected GitHub account.',
-  git: 'Any git host: GitLab, Bitbucket, Gitea, or GitHub with a token.',
-};
+const newProject = '__new';
 
 export function NewAppModal({ opened, onClose, projectId }: { opened: boolean; onClose: () => void; projectId?: string }) {
   const navigate = useNavigate();
@@ -22,11 +20,13 @@ export function NewAppModal({ opened, onClose, projectId }: { opened: boolean; o
   const [project, setProject] = useState<string | null>(null);
   const [source, setSource] = useState<SourceChoice>('upload');
   const [git, setGit] = useState<GitSourceValue>(emptyGitSource('github'));
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [addingToken, setAddingToken] = useState(false);
 
   useEffect(() => {
     if (!opened) return;
     if (projectId) setProject(projectId);
-    else if (!project && projects.data?.length) setProject(projects.data[0].id);
+    else if (!project && projects.data?.length === 1) setProject(projects.data[0].id);
   }, [opened, projectId, projects.data, project]);
 
   const reset = () => {
@@ -48,12 +48,12 @@ export function NewAppModal({ opened, onClose, projectId }: { opened: boolean; o
       queryClient.invalidateQueries({ queryKey: ['project'] });
       onClose();
       reset();
-      navigate(`/apps/${app.id}`);
+      navigate(appPath(app.project_id, app.id));
     },
   });
 
   return (
-    <Modal opened={opened} onClose={onClose} title="New app" size="md">
+    <Modal opened={opened} onClose={onClose} title="New app" size="md" closeOnEscape={!creatingProject && !addingToken}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -75,12 +75,14 @@ export function NewAppModal({ opened, onClose, projectId }: { opened: boolean; o
             required
             data-autofocus
           />
-          {(projects.data?.length ?? 0) > 1 && (
+          {!projectId && (
             <Select
               label="Project"
-              data={(projects.data ?? []).map((p) => ({ value: p.id, label: p.name }))}
+              placeholder={projects.data?.length === 0 ? 'Create your first project' : 'Pick a project'}
+              required
+              data={[...(projects.data ?? []).map((p) => ({ value: p.id, label: p.name })), { value: newProject, label: 'New project…' }]}
               value={project}
-              onChange={setProject}
+              onChange={(v) => (v === newProject ? setCreatingProject(true) : setProject(v))}
               allowDeselect={false}
             />
           )}
@@ -102,25 +104,19 @@ export function NewAppModal({ opened, onClose, projectId }: { opened: boolean; o
                 { value: 'git', label: 'Git URL' },
               ]}
             />
-            <Text size="xs" c="dimmed">
-              {sourceHelp[source]}
-            </Text>
           </Stack>
-          {source !== 'upload' && <GitSourceFields value={git} onChange={setGit} />}
-          <Text size="xs" c="dimmed">
-            Native or Docker is detected from the bundle: app.yaml runs natively, a Dockerfile runs in Docker. Set the port in app.yaml
-            or later on the app page.
-          </Text>
+          {source !== 'upload' && <GitSourceFields value={git} onChange={setGit} onDialog={setAddingToken} />}
           <Group justify="flex-end" gap="sm">
             <Button variant="default" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" loading={create.isPending} disabled={!name || (source !== 'upload' && !gitSourceReady(git))}>
+            <Button type="submit" loading={create.isPending} disabled={!name || !project || (source !== 'upload' && !gitSourceReady(git))}>
               Create app
             </Button>
           </Group>
         </Stack>
       </form>
+      <ProjectModal project={creatingProject ? 'new' : null} onClose={() => setCreatingProject(false)} onSaved={(p) => setProject(p.id)} />
     </Modal>
   );
 }

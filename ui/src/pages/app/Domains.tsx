@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { ActionIcon, Anchor, Badge, Button, Card, Code, Fieldset, Group, Modal, Stack, Table, Text, TextInput, Tooltip } from '@mantine/core';
+import { ActionIcon, Anchor, Badge, Box, Button, Card, Fieldset, Group, Modal, Stack, Table, Text, TextInput, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { IconCertificate, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router';
 
 import { api, queryClient } from '../../api';
 import {
@@ -15,9 +14,11 @@ import {
   emptyCertificate,
   type CertificateValue,
 } from '../../components/Certificate';
+import { ProxyOff } from '../../components/ProxyOff';
 import { tlsLabels, TLSPicker } from '../../components/TLSPicker';
 import type { App, Domain, ServerInfo, TLSMode } from '../../types';
 import { DomainEditor } from './DomainEditor';
+import { PortModal } from './Overview';
 
 
 export function Domains({ app }: { app: App }) {
@@ -27,6 +28,7 @@ export function Domains({ app }: { app: App }) {
   const [cert, setCert] = useState<CertificateValue>(emptyCertificate);
   const [replacing, setReplacing] = useState<Domain | null>(null);
   const [editing, setEditing] = useState<Domain | null>(null);
+  const [settingPort, setSettingPort] = useState(false);
   const server = useQuery({ queryKey: ['server'], queryFn: () => api.get<ServerInfo>('/server') });
 
   const refresh = () => {
@@ -66,106 +68,97 @@ export function Domains({ app }: { app: App }) {
 
   return (
     <Stack gap="lg">
-      <Card padding={0}>
-        <Text fw={600} p="md">
-          Domains
-        </Text>
-        <Table.ScrollContainer minWidth={620}>
-          <Table verticalSpacing="sm">
-            <Table.Tbody>
-              {app.domains.map((d) => (
-                <Table.Tr key={d.id}>
-                  <Table.Td>
-                    <Anchor href={`${d.tls === 'none' ? 'http' : 'https'}://${d.host}${d.path}`} target="_blank" size="sm">
-                      {d.host}
-                      {d.path === '/' ? '' : d.path}
-                    </Anchor>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap={4} wrap="nowrap">
-                      <Badge variant="light" color={d.tls === 'none' ? 'gray' : 'green'}>
-                        {tlsLabels[d.tls]}
-                      </Badge>
-                      {optionBadges(d).map((label) => (
-                        <Badge key={label} variant="outline" color="gray">
-                          {label}
+      {app.domains.length > 0 && (
+        <Card padding={0}>
+          <Text fw={600} p="md">
+            Domains
+          </Text>
+          <Table.ScrollContainer minWidth={620}>
+            <Table verticalSpacing="sm">
+              <Table.Tbody>
+                {app.domains.map((d) => (
+                  <Table.Tr key={d.id}>
+                    <Table.Td>
+                      <Anchor href={`${d.tls === 'none' ? 'http' : 'https'}://${d.host}${d.path}`} target="_blank" size="sm">
+                        {d.host}
+                        {d.path === '/' ? '' : d.path}
+                      </Anchor>
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap={4} wrap="nowrap">
+                        <Badge variant="light" color={d.tls === 'none' ? 'gray' : 'green'}>
+                          {tlsLabels[d.tls]}
                         </Badge>
-                      ))}
-                    </Group>
-                  </Table.Td>
-                  <Table.Td maw={320}>
-                    {d.tls === 'custom' ? (
-                      <CertificateSummary cert={d.certificate} />
-                    ) : (
-                      <Text size="sm" c="dimmed">
-                        → 127.0.0.1:{app.port}
-                      </Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap={4} justify="flex-end" wrap="nowrap">
-                      <Tooltip label="Edit proxy settings">
-                        <ActionIcon variant="subtle" color="gray" onClick={() => setEditing(d)}>
-                          <IconPencil size={16} />
-                        </ActionIcon>
-                      </Tooltip>
-                      {d.tls === 'custom' && (
-                        <Tooltip label="Replace certificate">
-                          <ActionIcon variant="subtle" color="gray" onClick={() => setReplacing(d)}>
-                            <IconCertificate size={16} />
+                        {optionBadges(d).map((label) => (
+                          <Badge key={label} variant="outline" color="gray">
+                            {label}
+                          </Badge>
+                        ))}
+                      </Group>
+                    </Table.Td>
+                    <Table.Td maw={320}>
+                      {d.tls !== 'none' ? (
+                        <CertificateSummary cert={d.certificate} missing={d.tls === 'letsencrypt' ? 'Certificate not issued yet' : undefined} />
+                      ) : (
+                        <Text size="sm" c="dimmed">
+                          → 127.0.0.1:{app.port}
+                        </Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap={4} justify="flex-end" wrap="nowrap">
+                        <Tooltip label="Edit proxy settings">
+                          <ActionIcon variant="subtle" color="gray" onClick={() => setEditing(d)}>
+                            <IconPencil size={16} />
                           </ActionIcon>
                         </Tooltip>
-                      )}
-                      <ActionIcon
-                        variant="subtle"
-                        color="red"
-                        onClick={() =>
-                          modals.openConfirmModal({
-                            title: `Remove ${d.host}${d.path === '/' ? '' : d.path}?`,
-                            labels: { confirm: 'Remove', cancel: 'Cancel' },
-                            confirmProps: { color: 'red' },
-                            onConfirm: () => remove.mutate(d.id),
-                          })
-                        }
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Group>
-                  </Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        </Table.ScrollContainer>
-        {app.domains.length === 0 && (
-          <Text c="dimmed" size="sm" px="md" pb="md">
-            No domains yet.
-          </Text>
-        )}
-      </Card>
+                        {d.tls === 'custom' && (
+                          <Tooltip label="Replace certificate">
+                            <ActionIcon variant="subtle" color="gray" onClick={() => setReplacing(d)}>
+                              <IconCertificate size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                        )}
+                        <ActionIcon
+                          variant="subtle"
+                          color="red"
+                          onClick={() =>
+                            modals.openConfirmModal({
+                              title: `Remove ${d.host}${d.path === '/' ? '' : d.path}?`,
+                              labels: { confirm: 'Remove', cancel: 'Cancel' },
+                              confirmProps: { color: 'red' },
+                              onConfirm: () => remove.mutate(d.id),
+                            })
+                          }
+                        >
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
+        </Card>
+      )}
 
       <Card>
         <Text fw={600}>Add domain</Text>
-        {blocked && (
-          <Text size="sm" c="dimmed">
-            {proxyOff ? (
-              <>
-                The reverse proxy is off.{' '}
-                <Anchor component={Link} to="/settings/proxy" size="sm">
-                  Turn it on
-                </Anchor>{' '}
-                to serve domains.
-              </>
-            ) : (
-              <>
-                Set the app's port first, on the{' '}
-                <Anchor component={Link} to={`/apps/${app.id}`} size="sm">
-                  Overview
-                </Anchor>{' '}
-                or with <Code>port:</Code> in app.yaml.
-              </>
-            )}
-          </Text>
+        {proxyOff && (
+          <Box mt="xs">
+            <ProxyOff>Domains are served by the reverse proxy, which is off.</ProxyOff>
+          </Box>
+        )}
+        {!proxyOff && !app.port && (
+          <Group justify="space-between" mt="xs" wrap="nowrap">
+            <Text size="sm" c="dimmed">
+              The app needs a port first.
+            </Text>
+            <Button size="compact-sm" variant="default" onClick={() => setSettingPort(true)}>
+              Set port
+            </Button>
+          </Group>
         )}
         <form
           onSubmit={(e) => {
@@ -179,7 +172,7 @@ export function Domains({ app }: { app: App }) {
                 <TextInput label="Host" placeholder="app.example.com" value={host} onChange={(e) => setHost(e.currentTarget.value)} required style={{ flex: 2, minWidth: 220 }} />
                 <TextInput label="Path" value={path} onChange={(e) => setPath(e.currentTarget.value)} w={120} />
               </Group>
-              <TLSPicker value={tls} onChange={setTLS} />
+              <TLSPicker value={tls} onChange={setTLS} disabled={blocked} />
               {tls === 'custom' && (
                 <Stack gap={4}>
                   <Text size="sm" fw={500}>
@@ -188,10 +181,7 @@ export function Domains({ app }: { app: App }) {
                   <CertificateFields value={cert} onChange={setCert} />
                 </Stack>
               )}
-              <Group justify="space-between" align="flex-start">
-                <Text size="xs" c="dimmed" maw={520}>
-                  Point the domain's DNS at this server first.
-                </Text>
+              <Group justify="flex-end">
                 <Button
                   type="submit"
                   leftSection={<IconPlus size={16} />}
@@ -206,6 +196,7 @@ export function Domains({ app }: { app: App }) {
         </form>
       </Card>
 
+      <PortModal app={app} opened={settingPort} onClose={() => setSettingPort(false)} />
       <DomainEditor domain={editing} onClose={() => setEditing(null)} onSaved={refresh} />
       <ReplaceCertificate domain={replacing} shared={replacing ? sharedPaths(replacing) : false} onClose={() => setReplacing(null)} onDone={refresh} />
     </Stack>

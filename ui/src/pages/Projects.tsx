@@ -34,7 +34,6 @@ export function ProjectsPage() {
     <Stack gap="lg">
       <PageHeader
         title="Projects"
-        description="Group related apps together."
         actions={
           <Button leftSection={<IconPlus size={16} />} onClick={() => setEditing('new')}>
             New project
@@ -61,7 +60,7 @@ export function ProjectsPage() {
               </Text>
             </Group>
             <Text size="sm" c="dimmed" mt={6} lineClamp={2} mih={40}>
-              {p.description || 'No description'}
+              {p.description}
             </Text>
             <Group justify="space-between" mt="md">
               <Text size="xs" c="dimmed">
@@ -73,7 +72,7 @@ export function ProjectsPage() {
                 </Text>
                 {p.unhealthy > 0 && (
                   <Text size="sm" c="orange" fw={500}>
-                    · {p.unhealthy} need attention
+                    · {p.unhealthy} {p.unhealthy === 1 ? 'needs' : 'need'} attention
                   </Text>
                 )}
               </Group>
@@ -91,7 +90,16 @@ export function ProjectsPage() {
   );
 }
 
-export function ProjectModal({ project, onClose }: { project: Project | 'new' | null; onClose: () => void }) {
+// ProjectModal creates or edits a project. onSaved gets the stored project.
+export function ProjectModal({
+  project,
+  onClose,
+  onSaved,
+}: {
+  project: Project | 'new' | null;
+  onClose: () => void;
+  onSaved?: (p: Project) => void;
+}) {
   const isNew = project === 'new';
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -105,10 +113,11 @@ export function ProjectModal({ project, onClose }: { project: Project | 'new' | 
   const save = useMutation({
     mutationFn: () =>
       isNew ? api.post<Project>('/projects', { name, description }) : api.put<Project>(`/projects/${(project as Project).id}`, { name, description }),
-    onSuccess: () => {
+    onSuccess: (p) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['projects-list'] });
       queryClient.invalidateQueries({ queryKey: ['project'] });
+      onSaved?.(p);
       onClose();
     },
   });
@@ -128,7 +137,7 @@ export function ProjectModal({ project, onClose }: { project: Project | 'new' | 
             </Alert>
           )}
           <TextInput label="Name" value={name} onChange={(e) => setName(e.currentTarget.value)} required data-autofocus />
-          <Textarea label="Description" value={description} onChange={(e) => setDescription(e.currentTarget.value)} autosize minRows={2} />
+          <Textarea label="Description (optional)" value={description} onChange={(e) => setDescription(e.currentTarget.value)} autosize minRows={2} />
           <Group justify="flex-end">
             <Button variant="default" onClick={onClose}>
               Cancel

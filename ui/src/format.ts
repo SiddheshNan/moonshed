@@ -58,3 +58,31 @@ export function summarizeError(err: string, max = 140): string {
   const line = err.split('\n')[0].trim();
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 }
+
+const triggerLabels: Record<string, string> = {
+  upload: 'Zip upload',
+  api: 'API token',
+  manual: 'Manual',
+  github_app: 'GitHub push',
+  github_webhook: 'GitHub webhook',
+  gitlab_webhook: 'GitLab webhook',
+  deploy_hook: 'Deploy hook',
+  redeploy: 'Redeploy',
+};
+
+// triggerLabel names what started a deployment.
+export function triggerLabel(trigger: string): string {
+  return triggerLabels[trigger] ?? trigger;
+}
+
+// runtimeLabel names an app's runtime, or '' before it's detected.
+export function runtimeLabel(runtime: string): string {
+  return runtime === 'docker' ? 'Docker' : runtime === 'native' ? 'Native' : '';
+}
+
+// sourceLabel says where an app's versions come from: owner/repo for git, else zip upload.
+export function sourceLabel(app: { source: string; git_url: string }): string {
+  if (app.source !== 'git') return 'Zip upload';
+  const path = app.git_url.replace(/^(?:https?:\/\/(?:[^@/]+@)?[^/]+\/|[^@]+@[^:]+:)/, '').replace(/\.git$/, '').replace(/\/$/, '');
+  return path || app.git_url;
+}

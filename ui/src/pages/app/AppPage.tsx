@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Alert, Badge, Button, Center, Loader, Modal, Stack, Tabs } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconPlayerPlay, IconPlayerStop, IconRefresh, IconRocket } from '@tabler/icons-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useNavigate, useParams } from 'react-router';
+import { Navigate, useNavigate, useParams } from 'react-router';
 
 import { api, queryClient } from '../../api';
 import { PageHeader } from '../../components/PageHeader';
+import { Commit } from '../../components/Commit';
 import { AppStatusBadge } from '../../components/StatusBadge';
-import { timeAgo } from '../../format';
+import { runtimeLabel, timeAgo, triggerLabel } from '../../format';
+import { appPath } from '../../paths';
 import type { App, Project } from '../../types';
 import { Backups } from './Backups';
 import { Deployments } from './Deployments';
@@ -32,18 +34,24 @@ const tabs = [
 ];
 
 // deployedSummary says what is running: when it was deployed and from which commit or upload.
-function deployedSummary(a: App): string {
+function deployedSummary(a: App): ReactNode {
   const d = a.deployed;
   if (!d) return a.current_release_id ? 'Deployed' : 'Not deployed yet';
   const when = `Deployed ${timeAgo(d.finished_at ?? d.created_at)}`;
-  if (d.git_commit) return `${when} · ${a.git_branch || 'main'} @ ${d.git_commit.slice(0, 7)}${d.git_message ? ` · ${d.git_message}` : ''}`;
-  return `${when} · from ${d.trigger === 'api' ? 'CI upload' : d.trigger}`;
+  if (!d.git_commit) return `${when} · ${triggerLabel(d.trigger)}`;
+  return (
+    <>
+      {when} · {a.git_branch || 'main'} @ <Commit gitUrl={a.git_url} sha={d.git_commit} />
+      {d.git_message && ` · ${d.git_message}`}
+    </>
+  );
 }
 
 export function AppPage() {
   const params = useParams();
   const navigate = useNavigate();
   const id = params.id ?? '';
+  const projectId = params.projectId ?? '';
   const tab = params['*'] || 'overview';
   const [uploading, setUploading] = useState(false);
   const app = useQuery({ queryKey: ['app', id], queryFn: () => api.get<App>(`/apps/${id}`), refetchInterval: 3000 });
@@ -55,7 +63,7 @@ export function AppPage() {
       queryClient.invalidateQueries({ queryKey: ['app', id] });
       queryClient.invalidateQueries({ queryKey: ['apps'] });
       queryClient.invalidateQueries({ queryKey: ['deployments', id] });
-      if (name === 'deploy') navigate(`/apps/${id}/deployments`);
+      if (name === 'deploy') navigate(appPath(projectId, id, 'deployments'));
     },
     onError: (err) => notifications.show({ color: 'red', title: 'Action failed', message: err.message }),
   });
@@ -72,6 +80,10 @@ export function AppPage() {
   }
 
   const a = app.data;
+  if (a.project_id !== projectId) {
+    // The app was moved to another project; follow it.
+    return <Navigate to={appPath(a.project_id, a.id, tab === 'overview' ? '' : tab)} replace />;
+  }
   const project = projects.data?.find((p) => p.id === a.project_id);
   const running = a.status.state === 'running' || a.status.state === 'crashed';
 
@@ -89,7 +101,7 @@ export function AppPage() {
             <AppStatusBadge app={a} />
             {a.runtime && (
               <Badge variant="default" fw={500}>
-                {a.runtime}
+                {runtimeLabel(a.runtime)}
               </Badge>
             )}
           </>
@@ -138,7 +150,7 @@ export function AppPage() {
         }
       />
 
-      <Tabs value={tab} onChange={(v) => navigate(`/apps/${id}/${v === 'overview' ? '' : v}`)} keepMounted={false}>
+      <Tabs value={tab} onChange={(v) => navigate(appPath(projectId, id, v === 'overview' ? '' : (v ?? '')))} keepMounted={false}>
         <Tabs.List mb="lg">
           {tabs.map((t) => (
             <Tabs.Tab key={t.value} value={t.value}>

@@ -56,9 +56,9 @@ export const theme = createTheme({
   fontFamilyMonospace: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
   radius: { xs: '4px', sm: '6px', md: '8px', lg: '10px', xl: '14px' },
   headings: {
-    fontWeight: '600',
+    fontWeight: '650',
     sizes: {
-      h2: { fontSize: '1.375rem', lineHeight: '1.3' },
+      h2: { fontSize: '1.5rem', lineHeight: '1.25' },
       h3: { fontSize: '1.125rem', lineHeight: '1.35' },
     },
   },
@@ -68,7 +68,7 @@ export const theme = createTheme({
     }),
     Card: Card.extend({
       defaultProps: { withBorder: true, radius: 'md' },
-      styles: { root: { background: 'var(--app-surface)', borderColor: 'var(--app-border)' } },
+      styles: { root: { background: 'var(--app-surface)', borderColor: 'var(--app-border)', boxShadow: 'var(--app-card-shadow)' } },
     }),
     Paper: Paper.extend({
       defaultProps: { radius: 'md' },
@@ -99,13 +99,18 @@ export const theme = createTheme({
           fontWeight: 500,
           color: 'var(--mantine-color-dimmed)',
           whiteSpace: 'nowrap',
+          background: 'var(--app-subtle)',
         },
         td: { borderColor: 'var(--app-border)' },
         tr: { borderColor: 'var(--app-border)' },
       },
     }),
     Tabs: Tabs.extend({
-      styles: { tab: { fontWeight: 500, fontSize: 'var(--mantine-font-size-sm)' } },
+      styles: {
+        // One row of tabs that scrolls sideways on narrow screens, rather than wrapping.
+        list: { flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none' },
+        tab: { fontWeight: 500, fontSize: 'var(--mantine-font-size-sm)', whiteSpace: 'nowrap', flex: 'none' },
+      },
     }),
     SegmentedControl: SegmentedControl.extend({
       defaultProps: { radius: 'md' },
@@ -133,6 +138,7 @@ export const resolver: CSSVariablesResolver = () => ({
     '--app-border': '#e8e8eb',
     '--app-hover': '#f6f6f7',
     '--app-active': '#efeff1',
+    '--app-card-shadow': '0 1px 2px rgba(16, 16, 24, 0.04), 0 1px 3px rgba(16, 16, 24, 0.05)',
   },
   dark: {
     '--mantine-color-body': '#0c0c0e',
@@ -142,6 +148,7 @@ export const resolver: CSSVariablesResolver = () => ({
     '--app-border': '#232327',
     '--app-hover': '#18181b',
     '--app-active': '#1d1d21',
+    '--app-card-shadow': 'inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 1px 2px rgba(0, 0, 0, 0.4)',
     '--mantine-color-default-border': '#2a2a2f',
     '--mantine-color-dimmed': '#8a8a93',
   },

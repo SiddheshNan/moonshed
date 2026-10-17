@@ -19,6 +19,7 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { Spotlight, spotlight, type SpotlightActionData } from '@mantine/spotlight';
 import {
+  IconApps,
   IconCertificate,
   IconFolder,
   IconGitBranch,
@@ -39,6 +40,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from 'react-router';
 
 import { api, queryClient } from '../api';
+import { appPath } from '../paths';
 import type { App, Project, User } from '../types';
 import { StatusDot } from './StatusBadge';
 
@@ -67,6 +69,7 @@ export function Logo({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
 const home = [
   { to: '/', label: 'Dashboard', icon: IconLayoutDashboard, exact: true },
   { to: '/projects', label: 'Projects', icon: IconFolder },
+  { to: '/apps', label: 'Apps', icon: IconApps },
   { to: '/deployments', label: 'Deployments', icon: IconRocket },
   { to: '/requests', label: 'Requests', icon: IconTransfer },
 ];
@@ -85,7 +88,7 @@ function NavSection({ title, items, onNavigate }: { title: string; items: typeof
   const location = useLocation();
   return (
     <Stack gap={2}>
-      <Text size="xs" c="dimmed" fw={500} px="sm" mb={4}>
+      <Text className="nav-heading" px="sm" mb={6}>
         {title}
       </Text>
       {items.map((item) => (
@@ -115,7 +118,7 @@ function Search() {
       label: app.name,
       description: `App in ${projectName.get(app.project_id) ?? 'project'} · ${app.runtime}`,
       leftSection: <StatusDot app={app} />,
-      onClick: () => navigate(`/apps/${app.id}`),
+      onClick: () => navigate(appPath(app.project_id, app.id)),
     })),
     ...(projects.data ?? []).map((p) => ({
       id: `project-${p.id}`,

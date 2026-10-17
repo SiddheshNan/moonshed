@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Badge, Button, Card, Center, Loader, Stack, Table, Text, TextInput } from '@mantine/core';
+import { Alert, Badge, Button, Card, Center, Loader, Stack, Table, Text, TextInput, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { IconPencil, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react';
@@ -9,7 +9,8 @@ import { useNavigate, useParams } from 'react-router';
 import { api, queryClient } from '../api';
 import { PageHeader } from '../components/PageHeader';
 import { AppStatusBadge } from '../components/StatusBadge';
-import { formatBytes, formatPercent } from '../format';
+import { formatBytes, formatPercent, runtimeLabel, sourceLabel } from '../format';
+import { appPath } from '../paths';
 import type { App, Project } from '../types';
 import { NewAppModal } from './NewAppModal';
 import { ProjectModal } from './Projects';
@@ -63,22 +64,24 @@ export function ProjectPage() {
             <Button variant="default" leftSection={<IconPencil size={16} />} onClick={() => setEditing(project)}>
               Edit
             </Button>
-            <Button
-              variant="default"
-              color="red"
-              leftSection={<IconTrash size={16} />}
-              onClick={() =>
-                modals.openConfirmModal({
-                  title: `Delete ${project.name}?`,
-                  children: <Text size="sm">Only empty projects can be deleted.</Text>,
-                  labels: { confirm: 'Delete', cancel: 'Cancel' },
-                  confirmProps: { color: 'red' },
-                  onConfirm: () => remove.mutate(),
-                })
-              }
-            >
-              Delete
-            </Button>
+            <Tooltip label="Move or delete its apps first" disabled={apps.length === 0}>
+              <Button
+                variant="default"
+                color="red"
+                leftSection={<IconTrash size={16} />}
+                disabled={apps.length > 0}
+                onClick={() =>
+                  modals.openConfirmModal({
+                    title: `Delete ${project.name}?`,
+                    labels: { confirm: 'Delete', cancel: 'Cancel' },
+                    confirmProps: { color: 'red' },
+                    onConfirm: () => remove.mutate(),
+                  })
+                }
+              >
+                Delete
+              </Button>
+            </Tooltip>
           </>
         }
       />
@@ -110,17 +113,23 @@ export function ProjectPage() {
                 {list.map((app) => {
                   const running = app.status.state === 'running';
                   return (
-                    <Table.Tr key={app.id} className="row-link" onClick={() => navigate(`/apps/${app.id}`)}>
-                      <Table.Td fw={600}>{app.name}</Table.Td>
+                    <Table.Tr key={app.id} className="row-link" onClick={() => navigate(appPath(app.project_id, app.id))}>
+                      <Table.Td fw={600} className="nowrap">
+                        {app.name}
+                      </Table.Td>
                       <Table.Td>
                         <AppStatusBadge app={app} />
                       </Table.Td>
                       <Table.Td>
-                        <Badge variant="default" fw={500}>
-                          {app.runtime}
-                        </Badge>
+                        {app.runtime && (
+                          <Badge variant="default" fw={500}>
+                            {runtimeLabel(app.runtime)}
+                          </Badge>
+                        )}
                       </Table.Td>
-                      <Table.Td c="dimmed">{app.source === 'git' ? 'git' : 'upload'}</Table.Td>
+                      <Table.Td c="dimmed" className="nowrap">
+                        {sourceLabel(app)}
+                      </Table.Td>
                       <Table.Td>{running && app.stats.processes ? formatPercent(app.stats.cpu) : '—'}</Table.Td>
                       <Table.Td>{running && app.stats.processes ? formatBytes(app.stats.memory) : '—'}</Table.Td>
                       <Table.Td>

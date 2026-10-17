@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Alert, Anchor, Button, Card, Code, Group, NumberInput, SimpleGrid, Stack, Text, TextInput } from '@mantine/core';
+import { Anchor, Button, Card, Code, Group, NumberInput, SimpleGrid, Stack, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router';
 
 import { api, queryClient } from '../../api';
 import {
@@ -14,6 +13,7 @@ import {
   type CertificateValue,
 } from '../../components/Certificate';
 import { PageHeader } from '../../components/PageHeader';
+import { ProxyOff } from '../../components/ProxyOff';
 import { TLSPicker } from '../../components/TLSPicker';
 import type { Backup, Settings, SettingsResponse } from '../../types';
 import { BackupTable } from '../app/Backups';
@@ -21,7 +21,7 @@ import { BackupTable } from '../app/Backups';
 export function GeneralSettingsPage() {
   return (
     <Stack gap="lg" maw={960}>
-      <PageHeader crumbs={[{ label: 'Settings' }]} title="General" description="Panel access and platform backups." />
+      <PageHeader crumbs={[{ label: 'Settings' }]} title="General" />
       <GeneralSettings />
       <PlatformBackups />
     </Stack>
@@ -89,41 +89,31 @@ function GeneralSettings() {
             <div>
               <Text fw={600}>Panel access</Text>
               <Text size="sm" c="dimmed">
-                The panel is always served on its own port, whatever the proxy is doing:{' '}
+                Always at{' '}
                 <Anchor href={panel.url} size="sm">
                   {panel.url}
                 </Anchor>
                 {panel.local ? (
                   <>
-                    {' '}
-                    (this machine only). Set <Code>panel_addr: ":5050"</Code> in config.yaml to reach it from the network.
+                    , this machine only. To reach it from the network, set <Code>panel_addr: ":5050"</Code> in <Code>{query.data.config_file}</Code>.
                   </>
                 ) : (
                   <>
-                    . Set <Code>panel_addr: "127.0.0.1:5050"</Code> in config.yaml to keep the panel off the network.
+                    . To keep it off the network, set <Code>panel_addr: "127.0.0.1:5050"</Code> in <Code>{query.data.config_file}</Code>.
                   </>
                 )}
               </Text>
             </div>
             <SimpleGrid cols={{ base: 1, sm: 2 }}>
               <TextInput
-                label="Panel domain"
-                description="Also serve the panel on a domain through the reverse proxy (optional)"
+                label="Panel domain (optional)"
                 placeholder="panel.example.com"
                 value={form.panel_domain}
                 onChange={(e) => set('panel_domain', e.currentTarget.value)}
               />
               <TLSPicker value={form.panel_tls} onChange={(v) => set('panel_tls', v)} disabled={!form.panel_domain} />
             </SimpleGrid>
-            {form.panel_domain && !form.proxy_enabled && (
-              <Alert color="orange" variant="light">
-                The panel domain only works while the reverse proxy is enabled. Turn it on under{' '}
-                <Anchor component={Link} to="/settings/proxy" size="sm">
-                  Settings › Proxy
-                </Anchor>
-                .
-              </Alert>
-            )}
+            {form.panel_domain && !form.proxy_enabled && <ProxyOff>The panel domain needs the reverse proxy.</ProxyOff>}
             {customPanelCert && (
               <Stack gap="xs">
                 <Text size="sm" fw={500}>
@@ -138,14 +128,13 @@ function GeneralSettings() {
                 )}
               </Stack>
             )}
+            <Group justify="flex-end">
+              <Button type="submit" loading={save.isPending}>
+                Save
+              </Button>
+            </Group>
           </Stack>
         </Card>
-
-        <Group justify="flex-end">
-          <Button type="submit" loading={save.isPending}>
-            Save settings
-          </Button>
-        </Group>
       </Stack>
     </form>
   );
@@ -177,8 +166,7 @@ function PlatformBackups() {
         <div>
           <Text fw={600}>Platform backups</Text>
           <Text size="sm" c="dimmed">
-            The platform database and its encryption key. To restore, stop the platform and extract the archive into{' '}
-            <Code>runtime/data/</Code>.
+            Database and encryption key. To restore, stop Moonshed and extract the archive into <Code>runtime/data/</Code>.
           </Text>
         </div>
         <Button variant="default" onClick={() => create.mutate()} loading={create.isPending}>

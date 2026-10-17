@@ -5,6 +5,7 @@ import { Navigate, Route, Routes } from 'react-router';
 import { api } from './api';
 import { Layout } from './components/Layout';
 import { AppPage } from './pages/app/AppPage';
+import { AppsPage } from './pages/AppsPage';
 import { Dashboard } from './pages/Dashboard';
 import { DeploymentsPage } from './pages/DeploymentsPage';
 import { Login } from './pages/Login';
@@ -40,7 +41,8 @@ export function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:id" element={<ProjectPage />} />
-        <Route path="/apps/:id/*" element={<AppPage />} />
+        <Route path="/projects/:projectId/apps/:id/*" element={<AppPage />} />
+        <Route path="/apps" element={<AppsPage />} />
         <Route path="/deployments" element={<DeploymentsPage />} />
         <Route path="/requests" element={<RequestsPage />} />
         <Route path="/settings" element={<GeneralSettingsPage />} />

@@ -1,21 +1,23 @@
 import { useState } from 'react';
-import { ActionIcon, Anchor, Button, Card, Code, Drawer, Group, SegmentedControl, Stack, Table, Text, Tooltip } from '@mantine/core';
+import { Anchor, Button, Card, Drawer, Group, SegmentedControl, Stack, Table, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconFileText, IconPlayerStop } from '@tabler/icons-react';
 import { useInfiniteQuery, useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router';
 
 import { api, queryClient } from '../api';
+import { Commit } from '../components/Commit';
 import { LogViewer } from '../components/LogViewer';
 import { PageHeader } from '../components/PageHeader';
 import { DeployStatusBadge, isActive } from '../components/StatusBadge';
-import { elapsed, formatDateTime, summarizeError, timeAgo } from '../format';
+import { elapsed, formatDateTime, summarizeError, timeAgo, triggerLabel } from '../format';
+import { appPath } from '../paths';
 import type { DeploymentRow } from '../types';
 
 const filters = [
   { value: '', label: 'All' },
-  { value: 'building', label: 'Building' },
   { value: 'queued', label: 'Queued' },
+  { value: 'building', label: 'Building' },
   { value: 'success', label: 'Succeeded' },
   { value: 'failed', label: 'Failed' },
   { value: 'killed', label: 'Killed' },
@@ -44,17 +46,17 @@ export function DeploymentsPage() {
 
   return (
     <Stack gap="lg">
-      <PageHeader title="Deployments" description="Every deployment across all apps, newest first." />
+      <PageHeader title="Deployments" />
       <SegmentedControl w="fit-content" data={filters} value={status} onChange={setStatus} />
       <Card padding={0}>
-        <Table.ScrollContainer minWidth={760}>
+        <Table.ScrollContainer minWidth={860}>
           <Table highlightOnHover>
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>App</Table.Th>
                 <Table.Th>Status</Table.Th>
+                <Table.Th>Source</Table.Th>
                 <Table.Th>Trigger</Table.Th>
-                <Table.Th>Commit</Table.Th>
                 <Table.Th>Started</Table.Th>
                 <Table.Th>Duration</Table.Th>
                 <Table.Th />
@@ -63,8 +65,8 @@ export function DeploymentsPage() {
             <Table.Tbody>
               {rows.map((d) => (
                 <Table.Tr key={d.id}>
-                  <Table.Td>
-                    <Anchor component={Link} to={`/apps/${d.app_id}/deployments`} fw={600} size="sm">
+                  <Table.Td className="nowrap">
+                    <Anchor component={Link} to={appPath(d.project_id, d.app_id, 'deployments')} fw={600} size="sm">
                       {d.app_name}
                     </Anchor>
                   </Table.Td>
@@ -78,32 +80,24 @@ export function DeploymentsPage() {
                       )}
                     </Stack>
                   </Table.Td>
-                  <Table.Td>{d.trigger}</Table.Td>
-                  <Table.Td>
-                    {d.git_commit ? (
-                      <Tooltip label={d.git_message || d.git_commit} disabled={!d.git_message}>
-                        <Code>{d.git_commit.slice(0, 7)}</Code>
-                      </Tooltip>
-                    ) : (
-                      '—'
-                    )}
+                  <Table.Td className="nowrap">
+                    {d.git_commit ? <Commit gitUrl={d.git_url} sha={d.git_commit} message={d.git_message} /> : d.bundle_id ? 'Zip upload' : '—'}
                   </Table.Td>
-                  <Table.Td>{timeAgo(d.created_at)}</Table.Td>
-                  <Table.Td>{elapsed(d.started_at, d.finished_at)}</Table.Td>
+                  <Table.Td className="nowrap">{triggerLabel(d.trigger)}</Table.Td>
+                  <Table.Td className="nowrap" title={formatDateTime(d.created_at)}>
+                    {timeAgo(d.created_at)}
+                  </Table.Td>
+                  <Table.Td className="nowrap">{elapsed(d.started_at, d.finished_at)}</Table.Td>
                   <Table.Td>
-                    <Group gap={4} justify="flex-end" wrap="nowrap">
+                    <Group gap="xs" justify="flex-end" wrap="nowrap">
                       {isActive(d.status) && (
-                        <Tooltip label="Kill">
-                          <ActionIcon color="red" onClick={() => kill.mutate(d.id)}>
-                            <IconPlayerStop size={16} />
-                          </ActionIcon>
-                        </Tooltip>
+                        <Button size="compact-sm" variant="light" color="red" leftSection={<IconPlayerStop size={14} />} onClick={() => kill.mutate(d.id)}>
+                          Kill build
+                        </Button>
                       )}
-                      <Tooltip label="View log">
-                        <ActionIcon onClick={() => setViewing(d)}>
-                          <IconFileText size={16} />
-                        </ActionIcon>
-                      </Tooltip>
+                      <Button size="compact-sm" variant="default" leftSection={<IconFileText size={14} />} onClick={() => setViewing(d)}>
+                        View log
+                      </Button>
                     </Group>
                   </Table.Td>
                 </Table.Tr>

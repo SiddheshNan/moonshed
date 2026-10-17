@@ -79,23 +79,32 @@ body {
   }
 }
 
-/* Nav: neutral highlight with an accent icon, rather than a tinted block */
+.mantine-Title-root {
+  letter-spacing: -0.015em;
+}
+
+/* Nav: a faint indigo tint and accent icon for the current page */
 .mantine-NavLink-root {
   color: var(--mantine-color-dimmed);
 }
 
 .mantine-NavLink-root:hover {
   color: var(--mantine-color-text);
-}
-
-.mantine-NavLink-root:hover {
   background: var(--app-hover);
 }
 
 .mantine-NavLink-root[data-active],
 .mantine-NavLink-root[data-active]:hover {
-  background: var(--app-active);
+  background: color-mix(in srgb, var(--mantine-color-indigo-5) 11%, transparent);
   color: var(--mantine-color-text);
+}
+
+.nav-heading {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mantine-color-dimmed);
 }
 
 .mantine-NavLink-root[data-active] .mantine-NavLink-section {
@@ -185,9 +194,30 @@ body {
 }
 
 .fact-label {
-  font-size: var(--mantine-font-size-xs);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: var(--mantine-color-dimmed);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+}
+
+.fact-value {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Title row of a card: the title on the left, its actions on the right, a divider below */
+.panel-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--app-border);
+  min-height: 56px;
+}
+
+/* Empty list: a quiet icon and one line */
+.empty-state {
+  padding: 32px 20px;
+  color: var(--mantine-color-dimmed);
 }
 
 .nowrap {

@@ -12,7 +12,7 @@ import type { APIToken } from '../../types';
 export function TokensPage() {
   return (
     <Stack gap="lg" maw={960}>
-      <PageHeader crumbs={[{ label: 'Settings' }]} title="API tokens" description="For CI pipelines and scripts." />
+      <PageHeader crumbs={[{ label: 'Settings' }]} title="API tokens" />
       <Tokens />
     </Stack>
   );
@@ -40,7 +40,7 @@ function Tokens() {
         <div>
           <Text fw={600}>Tokens</Text>
           <Text size="sm" c="dimmed">
-            For CI pipelines. Send as <Code>Authorization: Bearer &lt;token&gt;</Code>.
+            Send as <Code>Authorization: Bearer &lt;token&gt;</Code>.
           </Text>
         </div>
         {created && (

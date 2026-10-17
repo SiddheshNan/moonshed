@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { api } from '../../api';
 import { MetricChart, RangePicker, StatCard, UptimeBars } from '../../components/Charts';
+import { appLook } from '../../components/StatusBadge';
 import { elapsed, formatBytes, formatBytesShort, formatDateTime, formatPercent, formatSmallPercent } from '../../format';
 import type { App, AppMetrics, Health, Uptime } from '../../types';
 
@@ -31,11 +32,7 @@ export function Monitoring({ app }: { app: App }) {
     refetchInterval: 15000,
   });
   const u = uptime.data;
-  const badge = !app.current_release_id
-    ? { color: 'gray', label: 'Not deployed' }
-    : app.status.state === 'stopped'
-      ? { color: 'gray', label: 'Stopped' }
-      : u && healthLook[u.health];
+  const badge = app.status.state === 'running' ? u && healthLook[u.health] : appLook(app);
 
   return (
     <Stack gap="lg">
@@ -63,8 +60,7 @@ export function Monitoring({ app }: { app: App }) {
             </SimpleGrid>
             <UptimeBars bars={u.bars} start={u.bars_start} span={u.bar_span} />
             <Text size="xs" c="dimmed">
-              The share of health checks that passed. The check is the one in app.yaml, or "is the process running" when there isn't
-              one. Periods with no checks (not deployed, stopped, platform offline) show as no data.
+              {app.health_check ? `Share of passed health checks (${app.health_check}).` : 'Share of checks that found the process running.'}
             </Text>
             {u.incidents.length > 0 && (
               <Table.ScrollContainer minWidth={520}>
