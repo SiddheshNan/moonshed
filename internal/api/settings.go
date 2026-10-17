@@ -106,9 +106,13 @@ func (s *Server) proxyCaddyfile(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (s *Server) settingsResponse(st *settings) map[string]any {
-	resp := map[string]any{"settings": st, "proxy": s.Proxy.Status(), "panel_addr": s.PanelAddr}
-	if st.PanelDomain != "" && st.PanelTLS == store.TLSCustom {
+	resp := map[string]any{"settings": st, "proxy": s.Proxy.Status(), "panel_addr": s.PanelAddr, "config_file": s.ConfigFile}
+	switch {
+	case st.PanelDomain == "":
+	case st.PanelTLS == store.TLSCustom:
 		resp["panel_certificate"] = s.Proxy.Certificate(st.PanelDomain)
+	case st.PanelTLS == store.TLSLetsEncrypt:
+		resp["panel_certificate"] = s.Proxy.IssuedCertificate(st.PanelDomain)
 	}
 	return resp
 }

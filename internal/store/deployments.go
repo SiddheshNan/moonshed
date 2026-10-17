@@ -116,11 +116,15 @@ const (
 	DeployFailed   = "failed"
 	DeployKilled   = "killed"
 
-	TriggerUpload   = "upload"
-	TriggerGit      = "git"
-	TriggerWebhook  = "webhook"
-	TriggerRedeploy = "redeploy"
-	TriggerAPI      = "api"
+	// What started a deployment.
+	TriggerUpload        = "upload"         // zip uploaded in the UI
+	TriggerAPI           = "api"            // zip uploaded, or a git deploy requested, with an API token
+	TriggerManual        = "manual"         // Deploy pressed in the UI for a git app
+	TriggerGitHubApp     = "github_app"     // push delivered by the connected GitHub App
+	TriggerGitHubWebhook = "github_webhook" // push to the app's own hook URL from GitHub
+	TriggerGitLabWebhook = "gitlab_webhook" // push to the app's own hook URL from GitLab
+	TriggerDeployHook    = "deploy_hook"    // the app's hook URL called with ?token=
+	TriggerRedeploy      = "redeploy"       // an earlier version redeployed
 )
 
 type Deployment struct {

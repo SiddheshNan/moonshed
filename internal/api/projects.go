@@ -38,17 +38,28 @@ func (s *Server) listProjects(w http.ResponseWriter, r *http.Request) error {
 			continue
 		}
 		sum.Apps++
-		switch {
-		case s.Deploy.Status(app).State == engine.StateRunning:
+		running := s.Deploy.Status(app).State == engine.StateRunning
+		if running {
 			sum.Running++
-			if s.Monitor.Health(app.ID) == health.Down {
-				sum.Unhealthy++
-			}
-		case app.DesiredState == store.StateRunning:
+		}
+		if s.needsAttention(app, running) {
 			sum.Unhealthy++
 		}
 	}
 	return ok(w, out)
+}
+
+// needsAttention matches the problems the UI shows for an app: down, crashed or
+// stopped when it should run, or its last deployment failed.
+func (s *Server) needsAttention(app *store.App, running bool) bool {
+	if running && s.Monitor.Health(app.ID) == health.Down {
+		return true
+	}
+	if !running && app.DesiredState == store.StateRunning {
+		return true
+	}
+	last, err := s.Store.Deployments(app.ID, 1)
+	return err == nil && len(last) > 0 && last[0].Status == store.DeployFailed
 }
 
 func (s *Server) getProject(w http.ResponseWriter, r *http.Request) error {
@@ -159,13 +170,6 @@ func (s *Server) deleteProject(w http.ResponseWriter, r *http.Request) error {
 	if n > 0 {
 		return errorf(http.StatusConflict, "move or delete the project's %d apps first", n)
 	}
-	projects, err := s.Store.Projects()
-	if err != nil {
-		return err
-	}
-	if len(projects) == 1 {
-		return errorf(http.StatusConflict, "the last project can't be deleted")
-	}
 	if err := s.Store.DeleteProject(id); err != nil {
 		return err
 	}
@@ -173,20 +177,13 @@ func (s *Server) deleteProject(w http.ResponseWriter, r *http.Request) error {
 	return noContent(w)
 }
 
-// projectFor returns the requested project, or the first one when none is given.
-func (s *Server) projectFor(id string) (string, error) {
-	if id != "" {
-		if _, err := s.Store.Project(id); err != nil {
-			return "", badRequest("project not found")
-		}
-		return id, nil
+// checkProject makes sure an app's project is given and exists.
+func (s *Server) checkProject(id string) error {
+	if id == "" {
+		return badRequest("project is required")
 	}
-	projects, err := s.Store.Projects()
-	if err != nil {
-		return "", err
+	if _, err := s.Store.Project(id); err != nil {
+		return badRequest("project not found")
 	}
-	if len(projects) == 0 {
-		return "", badRequest("create a project first")
-	}
-	return projects[0].ID, nil
+	return nil
 }

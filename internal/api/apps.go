@@ -3,6 +3,7 @@ package api
 import (
 	"cmp"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -27,6 +28,7 @@ type appView struct {
 	Health       string            `json:"health"`
 	HealthCheck  string            `json:"health_check"`
 	Deployed     *store.Deployment `json:"deployed"`
+	LastDeploy   *store.Deployment `json:"last_deployment"`
 	HasRunAsPass bool              `json:"has_run_as_password"`
 	Domains      []*domainView     `json:"domains"`
 }
@@ -43,6 +45,13 @@ func (s *Server) view(app *store.App) (*appView, error) {
 		Health:       s.Monitor.Health(app.ID),
 		HasRunAsPass: app.RunAsPassword != "",
 		Domains:      domains,
+	}
+	last, err := s.Store.Deployments(app.ID, 1)
+	if err != nil {
+		return nil, err
+	}
+	if len(last) > 0 {
+		v.LastDeploy = last[0]
 	}
 	if app.CurrentReleaseID != "" {
 		if rel, err := s.Store.Release(app.CurrentReleaseID); err == nil && rel.Manifest != nil && rel.Manifest.Health != nil {
@@ -216,13 +225,12 @@ func (s *Server) createApp(w http.ResponseWriter, r *http.Request) error {
 	if !validRuntime(in.Runtime) {
 		return badRequest("runtime must be native, docker, or empty to detect it from the bundle")
 	}
-	project, err := s.projectFor(in.ProjectID)
-	if err != nil {
+	if err := s.checkProject(in.ProjectID); err != nil {
 		return err
 	}
 	app := &store.App{
 		Name:          in.Name,
-		ProjectID:     project,
+		ProjectID:     in.ProjectID,
 		Runtime:       in.Runtime,
 		WebhookSecret: randomToken(),
 		DesiredState:  store.StateStopped,
@@ -270,10 +278,11 @@ func (s *Server) updateApp(w http.ResponseWriter, r *http.Request) error {
 			return badRequest("the runtime can only be changed before the first deployment")
 		}
 	}
-	if app.ProjectID, err = s.projectFor(cmp.Or(in.ProjectID, app.ProjectID)); err != nil {
+	if err := s.checkProject(in.ProjectID); err != nil {
 		return err
 	}
 	before := *app
+	app.ProjectID = in.ProjectID
 	app.Runtime = in.Runtime
 	in.apply(app)
 	if err := s.validateApp(app); err != nil {
@@ -385,7 +394,9 @@ func (s *Server) deployApp(w http.ResponseWriter, r *http.Request) error {
 	case "application/zip", "application/octet-stream":
 		d, err = s.Deploy.DeployUpload(app, r.Body, trigger)
 	default:
-		trigger = store.TriggerGit
+		if trigger == store.TriggerUpload {
+			trigger = store.TriggerManual
+		}
 		d, err = s.Deploy.DeployGit(app, trigger)
 		if err != nil {
 			return badRequest("%v", err)
@@ -394,7 +405,7 @@ func (s *Server) deployApp(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	s.auditApp(r, "app.deploy", app, "from "+trigger)
+	s.auditApp(r, "app.deploy", app, triggerLabels[trigger])
 	return writeJSON(w, http.StatusAccepted, d)
 }
 
@@ -454,7 +465,7 @@ func (s *Server) killDeployment(w http.ResponseWriter, r *http.Request) error {
 		return errorf(http.StatusConflict, "deployment is not running")
 	}
 	if app, err := s.Store.App(d.AppID); err == nil {
-		s.auditApp(r, "app.kill", app, "stopped a running deployment")
+		s.auditApp(r, "app.kill", app, "")
 	}
 	return noContent(w)
 }
@@ -484,7 +495,11 @@ func (s *Server) redeploy(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	s.auditApp(r, "app.redeploy", app, "redeployed an earlier version")
+	details := "zip upload"
+	if b, err := s.Store.Bundle(bundleID); err == nil && b.GitCommit != "" {
+		details = fmt.Sprintf("commit %.7s", b.GitCommit)
+	}
+	s.auditApp(r, "app.redeploy", app, details)
 	return writeJSON(w, http.StatusAccepted, d)
 }
 

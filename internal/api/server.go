@@ -33,20 +33,21 @@ import (
 )
 
 type Deps struct {
-	Version   string
-	PanelAddr string
-	DevUI     *url.URL
-	Paths     config.Paths
-	Store     *store.Store
-	Deploy    *deploy.Manager
-	Docker    *engine.Docker
-	Metrics   *metrics.Collector
-	MetricsDB *metrics.DB
-	Monitor   *health.Monitor
-	Backups   *backup.Service
-	Proxy     *proxy.Proxy
-	GitHub    *githost.GitHub
-	Requests  *requestlog.Log
+	Version    string
+	PanelAddr  string
+	ConfigFile string
+	DevUI      *url.URL
+	Paths      config.Paths
+	Store      *store.Store
+	Deploy     *deploy.Manager
+	Docker     *engine.Docker
+	Metrics    *metrics.Collector
+	MetricsDB  *metrics.DB
+	Monitor    *health.Monitor
+	Backups    *backup.Service
+	Proxy      *proxy.Proxy
+	GitHub     *githost.GitHub
+	Requests   *requestlog.Log
 }
 
 type Server struct {

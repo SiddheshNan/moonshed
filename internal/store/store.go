@@ -36,10 +36,6 @@ func Open(path string, box *secret.Box) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
-	if err := s.ensureProject(); err != nil {
-		db.Close()
-		return nil, err
-	}
 	return s, nil
 }
 
@@ -54,15 +50,6 @@ func checkSchema(db *sql.DB, path string) error {
 		return err
 	}
 	return fmt.Errorf("%s was created by an older development build; delete the runtime's data folder to start fresh", path)
-}
-
-// ensureProject creates the "default" project so there is always one to put apps in.
-func (s *Store) ensureProject() error {
-	var n int
-	if err := s.db.QueryRow("SELECT COUNT(*) FROM projects").Scan(&n); err != nil || n > 0 {
-		return err
-	}
-	return s.SaveProject(&Project{Name: "default"})
 }
 
 // NewID returns a UUIDv7.

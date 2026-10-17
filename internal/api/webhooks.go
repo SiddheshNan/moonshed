@@ -127,7 +127,7 @@ func (s *Server) handlePush(w http.ResponseWriter, r *http.Request, p push, matc
 		if app.Source != store.SourceGit || !match(app) || repoPath(app.GitURL) != p.Repo || cmp.Or(app.GitBranch, "main") != p.branch() {
 			continue
 		}
-		if !s.applyPush(r, app, p) {
+		if !s.applyPush(r, app, p, store.TriggerGitHubApp) {
 			pending = append(pending, app.Name)
 			continue
 		}
@@ -137,17 +137,17 @@ func (s *Server) handlePush(w http.ResponseWriter, r *http.Request, p push, matc
 }
 
 // applyPush deploys the app when autodeploy is on and reports whether it did.
-func (s *Server) applyPush(r *http.Request, app *store.App, p push) bool {
+func (s *Server) applyPush(r *http.Request, app *store.App, p push, trigger string) bool {
 	if !app.Autodeploy {
 		s.Store.SetPushedCommit(app.ID, p.Commit, p.Message)
 		return false
 	}
-	if _, err := s.Deploy.DeployGit(app, store.TriggerWebhook); err != nil {
+	if _, err := s.Deploy.DeployGit(app, trigger); err != nil {
 		s.Deploy.AppLog(app.Name).Printf("webhook deploy failed: %v", err)
 		return false
 	}
-	s.auditAs(r, store.ActorWebhook, "webhook", "app.deploy", "app", app.ID, app.Name,
-		fmt.Sprintf("push %.7s", p.Commit))
+	s.auditAs(r, store.ActorWebhook, triggerLabels[trigger], "app.deploy", "app", app.ID, app.Name,
+		fmt.Sprintf("push to %s, %.7s", p.branch(), p.Commit))
 	return true
 }
 
@@ -187,7 +187,7 @@ func (s *Server) appWebhook(w http.ResponseWriter, r *http.Request) error {
 		if err := json.Unmarshal(body, &payload); err != nil || payload.Deleted {
 			return ok(w, map[string]string{"status": "ignored"})
 		}
-		return s.appPush(w, r, app, push{Ref: payload.Ref, Commit: payload.After, Message: firstLine(payload.HeadCommit.Message)})
+		return s.appPush(w, r, app, push{Ref: payload.Ref, Commit: payload.After, Message: firstLine(payload.HeadCommit.Message)}, store.TriggerGitHubWebhook)
 
 	case r.Header.Get("X-Gitlab-Token") != "":
 		if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Gitlab-Token")), secret) != 1 {
@@ -213,30 +213,30 @@ func (s *Server) appWebhook(w http.ResponseWriter, r *http.Request) error {
 				p.Message = firstLine(c.Message)
 			}
 		}
-		return s.appPush(w, r, app, p)
+		return s.appPush(w, r, app, p, store.TriggerGitLabWebhook)
 
 	case r.URL.Query().Get("token") != "":
 		if subtle.ConstantTimeCompare([]byte(r.URL.Query().Get("token")), secret) != 1 {
 			return errorf(http.StatusUnauthorized, "invalid token")
 		}
-		d, err := s.Deploy.DeployGit(app, store.TriggerWebhook)
+		d, err := s.Deploy.DeployGit(app, store.TriggerDeployHook)
 		if err != nil {
 			return badRequest("%v", err)
 		}
-		s.auditAs(r, store.ActorWebhook, "deploy hook", "app.deploy", "app", app.ID, app.Name, "from a deploy hook")
+		s.auditAs(r, store.ActorWebhook, triggerLabels[store.TriggerDeployHook], "app.deploy", "app", app.ID, app.Name, "")
 		return writeJSON(w, http.StatusAccepted, d)
 	}
 	return errorf(http.StatusUnauthorized, "missing signature or token")
 }
 
-func (s *Server) appPush(w http.ResponseWriter, r *http.Request, app *store.App, p push) error {
+func (s *Server) appPush(w http.ResponseWriter, r *http.Request, app *store.App, p push, trigger string) error {
 	if app.Source != store.SourceGit {
 		return ok(w, map[string]string{"status": "ignored", "reason": "app is not deployed from git"})
 	}
 	if p.branch() != cmp.Or(app.GitBranch, "main") {
 		return ok(w, map[string]string{"status": "ignored", "reason": "different branch"})
 	}
-	if !s.applyPush(r, app, p) {
+	if !s.applyPush(r, app, p, trigger) {
 		return ok(w, map[string]string{"status": "pending", "reason": "autodeploy is off"})
 	}
 	return writeJSON(w, http.StatusAccepted, map[string]string{"status": "deploying"})

@@ -47,8 +47,11 @@ func (s *Server) domainView(d *store.Domain) *domainView {
 		c.Options.BasicAuth[i] = store.BasicAuthUser{User: u.User}
 	}
 	v := &domainView{Domain: &c}
-	if d.TLS == store.TLSCustom {
+	switch d.TLS {
+	case store.TLSCustom:
 		v.Certificate = s.Proxy.Certificate(d.Host)
+	case store.TLSLetsEncrypt:
+		v.Certificate = s.Proxy.IssuedCertificate(d.Host)
 	}
 	return v
 }

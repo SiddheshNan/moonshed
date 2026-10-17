@@ -2,9 +2,9 @@
 
 Moonshed is a lightweight, self-hosted deploy platform like Dokploy, but:
 
-- **One Go binary + SQLite.** No Postgres, Redis, Traefik or Docker required.
+- **One Go binary + SQLite.** No Postgres, Redis or separate proxy; the reverse proxy (Caddy) is built in, and Docker is optional.
 - **Runs on Linux and Windows.**
-- **Apps run natively or in Docker**, chosen per app.
+- **Apps run natively or in Docker**, detected per app from the bundle.
 - **Small footprint.** Must run comfortably on 1 core / 1GB RAM.
 
 ---
@@ -13,6 +13,7 @@ Moonshed is a lightweight, self-hosted deploy platform like Dokploy, but:
 
 | Term | Meaning |
 |---|---|
+| **Project** | A flat group of apps. |
 | **App** | Something you deploy. Has a name, runtime, port, env vars, domains. |
 | **Bundle** | A zip of the app: code + `app.yaml`. Uploaded, or created from a git checkout. |
 | **Release** | A bundle unpacked and built into a folder, ready to run. |
@@ -108,8 +109,8 @@ For an app that runs in Docker:
 
 - **Dockerfile:** the bundle must contain one.
 - **Scripts:** `pre` / `run` / `post` are not used. The Dockerfile's `RUN` and `CMD`/`ENTRYPOINT` replace them.
-- **Build:** `docker build` → image `moonshed/<app>:<release-id>`. The output goes to the build log, and the build can be killed like a native one.
-- **Run:** `docker run` with:
+- **Build:** BuildKit through the Docker API → image `moonshed/<app>:<release-id>`. The output goes to the build log, and the build can be killed like a native one.
+- **Run:** a container created through the Docker API with:
   - the env vars from the UI, plus `PORT`;
   - port `-p <port>:<port>`;
   - `persist` paths bind-mounted from `shared/`.
@@ -185,7 +186,8 @@ runtime/
   config/<env>.yaml      development.yaml / production.yaml, picked with the required -e flag
   data/
     moonshed.db          main SQLite DB (WAL mode)
-    metrics.db           metrics samples (separate to avoid write contention)
+    metrics.db           metrics tiers (separate to avoid write contention)
+    requests.db          recorded requests
     secret.key           key used to encrypt env vars and passwords at rest
   apps/<app>/
     bundles/<id>.zip     last X bundles (default 5, configurable per app)
@@ -200,8 +202,8 @@ runtime/
   backups/
     apps/<app>/          app backups (.tar.gz)
     platform/            platform DB backups (.tar.gz)
-  logs/moonshed-<date>.log
-  web/                   the built frontend
+  logs/moonshed-<date>.log   the platform log
+  web/                   the built UI
 ```
 
 `config/production.yaml` (every key is required; unknown keys are rejected):
@@ -249,22 +251,25 @@ Each app has one fixed port. A deploy causes a short gap while the old version s
 - **Build logs:** one file per build, kept as long as the build record.
 - **Live tail in the UI:** Server-Sent Events. A new stream starts with the tail of the newest log file, so it isn't empty after a restart.
 - **SQLite stores only metadata** (build/deployment rows, log file paths, exit codes), never log lines.
+- **Platform log:** one line per event, `[time] LEVEL component: message key=value`, on the console (colored in a terminal) and in `logs/moonshed-<date>.log`, rotated like app logs and kept 30 days. `log_level` in the config sets the minimum level. Caddy's own logs are reduced to warnings, errors and certificate events.
 
 ---
 
 ## 7. Reverse proxy, domains and TLS
 
-The proxy is built in, using Go `httputil.ReverseProxy` + `certmagic`. It handles HTTP/2 and WebSockets.
+The proxy is an embedded Caddy server. Moonshed generates its Caddyfile from the database, so Caddy handles HTTP/2, HTTP/3, WebSockets and certificates while Moonshed stays the only thing to configure.
 
-- **Turning it on:** the user decides whether the proxy is enabled. When it's off, apps are reached directly on their port.
-- **Domains:** each app can have one or more domains (like Dokploy), each with a path prefix (default `/`). The proxy forwards to `127.0.0.1:<app port>`.
+- **Turning it on:** the user decides whether the proxy is enabled (Settings › Proxy). When it's off, apps are reached directly on their port.
+- **Domains:** each app can have one or more domains (like Dokploy), each with a path prefix (default `/`). The proxy forwards to `127.0.0.1:<app port>`; apps without a port get no routes.
 - **TLS options per domain:**
   - **Let's Encrypt:** automatic issue and renewal (HTTP-01).
   - **Custom cert:** uploaded per domain (cert + key as PEM, or a PFX), checked to actually cover the host and not be expired. Stored per host, so paths on the same host share it. Removed automatically when no domain uses it any more.
   - **None:** plain HTTP.
+- **Domain options:** force HTTPS (on by default), HSTS, www redirect, compression, strip the path prefix, basic auth, IP allow list, request/response header rules and a max body size. Anything else can be added as raw Caddyfile directives per domain ("advanced").
+- **Global options:** trusted proxies, raw Caddy global options and extra site blocks, all in Settings › Proxy. The generated Caddyfile can be viewed there.
+- **Safety:** every change is validated before it's saved. If the running config fails only because of raw Caddyfile someone typed, the proxy runs without those parts and shows the error, so a bad snippet can't take every app offline.
+- **Reloads:** an unchanged config is not reloaded, since a reload closes idle keep-alive connections.
 - **Panel:** always reachable on `panel_addr` (default `:5050`, plain HTTP), even if the proxy is off or misconfigured. Bind it to `127.0.0.1:5050` to keep it off the network. Optionally it can also get a domain through the proxy (with Let's Encrypt, a custom certificate or plain HTTP); both ways keep working.
-- **Route storage:** routes live in memory, loaded from SQLite. Changing a route is an atomic swap with no reload.
-- **Redirect:** HTTP → HTTPS is automatic when TLS is on.
 
 ---
 
@@ -329,7 +334,7 @@ Deployments record the commit and its message.
 
 ## Projects
 
-Flat groups of apps. Every app belongs to one; existing apps were moved into "default". Only empty projects can be deleted, and the last one can't.
+Flat groups of apps. None exist until you create one, and every app must be created in a project. Only empty projects can be deleted.
 
 ## Audit log
 
@@ -350,9 +355,10 @@ Every change is recorded with who did it (user, API token, or webhook), when, fr
 
 ## 11. Auth and security
 
-- **Admin user:** created on first run. Login uses a session cookie.
+- **Admin user:** created on first run. Login uses a session cookie that lasts 30 days.
+- **Login throttling:** 10 failed logins from one IP within 15 minutes blocks further attempts from it until the window passes.
 - **Other users:** local accounts. All users are admins.
-- **API tokens:** for CI / push deploys. Only a hash is stored.
+- **API tokens:** for CI / push deploys, prefixed `msh_`. Only a hash is stored.
 - **Env vars:** encrypted at rest with AES-GCM using `secret.key`.
 - **Isolation:** native apps are not sandboxed. By default they run as the platform's service account. Set "run as OS user" per app (section 3) to limit what an app can touch.
 
@@ -366,7 +372,8 @@ IDs are UUIDv7 strings, except GitHub App and installation IDs (GitHub's own num
 users          (id, username, password_hash, created_at)
 sessions       (token_hash, user_id, expires_at)
 api_tokens     (id, user_id, name, token_hash, last_used_at, created_at)
-settings       (key, value)     proxy_enabled, acme_email, panel_domain, panel_tls, backup_cron, backup_keep
+settings       (key, value)     proxy_enabled, acme_email, panel_domain, panel_tls, proxy_trusted_proxies,
+                                proxy_global_options, proxy_extra_sites, backup_cron, backup_keep
 
 apps           (id, name, runtime[''|native|docker], port, source[upload|git],
                 git_url, git_branch, git_subdir, git_token (encrypted), webhook_secret,
@@ -374,12 +381,14 @@ apps           (id, name, runtime[''|native|docker], port, source[upload|git],
                 keep_bundles, log_retention_days, auto_restart, backup_cron, backup_keep,
                 current_release_id, desired_state[running|stopped], created_at)
 env_vars       (app_id, key, value (encrypted))
-domains        (id, app_id, host, path, tls[letsencrypt|custom|none])
+domains        (id, app_id, host, path, tls[letsencrypt|custom|none],
+                options (JSON: force_https, hsts, basic_auth, headers…), advanced (raw Caddyfile))
 
 bundles        (id, app_id, source[upload|git], git_commit, size, created_at)
 releases       (id, app_id, bundle_id, manifest (parsed app.yaml as JSON), image, created_at)
 deployments    (id, app_id, bundle_id, release_id, trigger, status, error,
                 created_at, started_at, finished_at)
+                trigger: upload | api | manual | github_app | github_webhook | gitlab_webhook | deploy_hook | redeploy
                 status: queued → building → starting → success | failed | killed
 
 incidents      (id, app_id, down_at, up_at, reason)
@@ -396,7 +405,9 @@ Apps also have `project_id`, `git_credential_id`, `github_installation_id`, `aut
 
 A "build" is the building phase of a deployment, so there is no separate builds table; killing a build kills the deployment.
 
-`metrics.db`: `samples` (raw, 24h), `samples_1m` (7 days), `samples_1h` (90 days), plus a `rollups` bookmark table.
+`metrics.db`: `targets` (server, app or domain) and `points` (target, metric, tier, bucket time, sum, min, max, count), one fixed-size set of buckets per tier (section 8).
+
+`requests.db`: `requests`, one row per recorded request (section "Requests").
 
 ---
 
@@ -416,19 +427,20 @@ GET    /api/apps/:id/deployments     GET /api/deployments/:id
 POST   /api/deployments/:id/kill     GET /api/deployments/:id/log   (SSE)
 GET    /api/apps/:id/bundles         POST /api/apps/:id/bundles/:bundle/redeploy   (rollback)
 GET/PUT /api/apps/:id/env
-GET/POST /api/apps/:id/domains       PUT/DELETE /api/domains/:id
-POST   /api/certificates             multipart: host + cert/key (PEM) or pfx/password
+GET/POST /api/apps/:id/domains       PUT/DELETE /api/domains/:id     (custom TLS: multipart with cert/key or pfx)
+PUT    /api/domains/:id/certificate  POST /api/domains/:id/check     (validate a draft without saving)
 GET    /api/apps/:id/logs?date=      GET /api/apps/:id/logs/days   GET /api/apps/:id/logs/stream (SSE)
 GET    /api/apps/:id/metrics?range=  GET /api/apps/:id/uptime?range=
 GET/POST /api/apps/:id/backups       GET/POST /api/platform/backups
 POST   /api/backups/:id/restore      GET /api/backups/:id/download   DELETE /api/backups/:id
 GET    /api/server                   GET /api/server/metrics?range=
-GET/PUT /api/settings
-GET/POST /api/projects              GET/PUT/DELETE /api/projects/:id
+GET/PUT /api/settings                POST /api/settings/panel-certificate
+POST   /api/settings/proxy-check     GET /api/proxy/caddyfile
+GET/POST /api/projects               GET/PUT/DELETE /api/projects/:id
 GET    /api/deployments              (all apps; ?status=&before=&limit=)
 GET    /api/audit                    (?action=&actor=&before=&limit=)
 GET    /api/requests                 GET/PUT /api/requests/recording
-GET    /api/git                      POST /api/git/credentials   PUT/DELETE /api/git/credentials/:id
+GET    /api/git                      POST /api/git/credentials    PUT/DELETE /api/git/credentials/:id
 POST   /api/git/github/manifest      GET /api/git/github/callback   GET /api/git/github/setup
 POST   /api/git/github/:id/sync      DELETE /api/git/github/:id
 GET    /api/git/installations/:id/repos    GET /api/git/installations/:id/branches?repo=
@@ -443,14 +455,19 @@ Auth is a session cookie for the UI, or `Authorization: Bearer msh_...` for API 
 ## 14. Install and CLI
 
 ```
-moonshed serve                  run the platform (normally run by the service)
-moonshed install                register the platform as a systemd unit / Windows service (auto-start on boot)
+moonshed serve -e <env>             run the platform (normally run by the service)
+moonshed install -e <env>           register a systemd unit / Windows service (auto-start on boot)
 moonshed uninstall
 moonshed reset-password <user>
+moonshed version
 ```
 
-- **Install:** download one binary, run `moonshed install`, open the UI.
-- **Upgrade:** replace the binary and restart the service. Apps restart with it.
+- **`-e` (or `ENV`):** `development` or `production`, selecting `runtime/config/<env>.yaml`. Required for `serve` and `install`; Moonshed refuses to start when the file is missing, has unknown keys or leaves one out. `install` records it in the service definition.
+- **`--runtime` (or `RUNTIME_DIR`):** the runtime folder. Defaults to `runtime/` next to the binary, then `./runtime`.
+- **Install:** copy a release bundle (binary + `runtime/config/production.yaml` + `runtime/web/`), run `moonshed install -e production`, open the UI.
+- **Upgrade:** replace the binary and `runtime/web/`, then restart the service. Apps restart with it.
+- **Release builds:** `scripts/build.py` writes the version, optionally vets and tests, builds the UI and cross-compiles one bundle per platform into `dist/<os>-<arch>/`.
+- **Development:** `development.yaml` sets `ui` to the Vite dev server, so the panel forwards every non-API request to it and UI changes show up live, on `:5050` and on the panel's domain alike.
 
 ---
 
@@ -460,23 +477,25 @@ moonshed reset-password <user>
 |---|---|
 | Language | Go |
 | DB | SQLite via `modernc.org/sqlite` (pure Go, no CGO, easy Windows builds) |
-| Config | `gopkg.in/yaml.v3` |
-| TLS / ACME | `certmagic` |
+| Config | `gopkg.in/yaml.v3`, strict decoding |
+| Reverse proxy / TLS / ACME | Embedded Caddy v2 (Caddyfile generated from the DB) |
+| Logging | `log/slog` with Moonshed's own handler (`internal/logger`) |
 | Metrics | `gopsutil` |
 | Windows service / Job Objects | `golang.org/x/sys/windows`, `golang.org/x/sys/windows/svc` |
 | Git | `go-git` |
 | Docker | Official Docker Go client + BuildKit client |
 | Cron | `robfig/cron` |
-| UI | React + Vite + Mantine, served from `runtime/web/`. Sidebar: Dashboard, Projects, Deployments, Requests; Settings: General, Git, Certificates, Users, API tokens, Audit log; ⌘K search |
+| UI | React + Vite + Mantine (`ui/`), served from `runtime/web/`. Sidebar: Dashboard, Projects, Apps, Deployments, Requests; Settings: General, Proxy, Git, Certificates, Users, API tokens, Audit log; ⌘K search |
 
 Target memory use: under 50MB RSS for the platform itself (measured ~15MB with 3 apps).
 
 ---
 
-## 16. Platform support
+## 16. Platform support and license
 
 - **Linux / Windows:** fully supported.
 - **macOS:** builds and runs for local testing only. Not supported for production.
+- **License:** AGPL-3.0. The repository layout and contribution rules are in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ---
 

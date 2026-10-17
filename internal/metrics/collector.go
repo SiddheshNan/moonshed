@@ -69,7 +69,7 @@ type Collector struct {
 
 	mu       sync.Mutex
 	agg      *aggregator
-	server   ServerStats
+	server   *ServerStats
 	apps     map[string]AppStats
 	disk     map[string]int64
 	diskAt   time.Time
@@ -128,7 +128,8 @@ func (c *Collector) Record(target, metric string, value float64) {
 	c.save(closed)
 }
 
-func (c *Collector) Server() ServerStats {
+// Server returns the latest server stats, or nil before the first sample.
+func (c *Collector) Server() *ServerStats {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.server
@@ -184,7 +185,7 @@ func (c *Collector) collect(now time.Time) {
 		closed = append(closed, c.agg.add(now, s.target, s.metric, s.value)...)
 	}
 	closed = append(closed, c.agg.flush(now)...)
-	c.server = server
+	c.server = &server
 	c.apps = appStats
 	c.mu.Unlock()
 	c.save(closed)

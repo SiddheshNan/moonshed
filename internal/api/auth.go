@@ -116,7 +116,7 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	s.auditAs(r, store.ActorUser, u.Username, "user.setup", "user", u.ID, u.Username, "first admin created")
+	s.auditAs(r, store.ActorUser, u.Username, "user.setup", "user", u.ID, u.Username, "")
 	return s.startSession(w, r, u)
 }
 

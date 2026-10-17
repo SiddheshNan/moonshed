@@ -10,6 +10,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"log/slog"
 	"net"
@@ -353,6 +354,31 @@ func (p *Proxy) Certificate(host string) *CertInfo {
 		Issuer:   cmp.Or(pair.Leaf.Issuer.CommonName, pair.Leaf.Issuer.String()),
 		NotAfter: pair.Leaf.NotAfter,
 	}
+}
+
+// IssuedCertificate describes the certificate Caddy obtained for host (Let's Encrypt), or nil
+// if it hasn't been issued yet. Caddy keeps one folder per issuer; the newest certificate wins.
+func (p *Proxy) IssuedCertificate(host string) *CertInfo {
+	dir := strings.ReplaceAll(host, "*", "wildcard_")
+	files, _ := filepath.Glob(filepath.Join(p.paths.Certs(), "acme", "certificates", "*", dir, dir+".crt"))
+	var best *x509.Certificate
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		block, _ := pem.Decode(data)
+		if block == nil {
+			continue
+		}
+		if c, err := x509.ParseCertificate(block.Bytes); err == nil && (best == nil || c.NotAfter.After(best.NotAfter)) {
+			best = c
+		}
+	}
+	if best == nil {
+		return nil
+	}
+	return &CertInfo{Names: names(best), Issuer: cmp.Or(best.Issuer.CommonName, best.Issuer.String()), NotAfter: best.NotAfter}
 }
 
 func names(c *x509.Certificate) []string {

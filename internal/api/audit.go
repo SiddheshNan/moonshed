@@ -45,6 +45,18 @@ func (s *Server) auditAs(r *http.Request, actorType, actorName, action, targetTy
 	})
 }
 
+// triggerLabels name deployment triggers in the audit log, the same way the UI does.
+var triggerLabels = map[string]string{
+	store.TriggerUpload:        "Zip upload",
+	store.TriggerAPI:           "API token",
+	store.TriggerManual:        "Manual",
+	store.TriggerGitHubApp:     "GitHub push",
+	store.TriggerGitHubWebhook: "GitHub webhook",
+	store.TriggerGitLabWebhook: "GitLab webhook",
+	store.TriggerDeployHook:    "Deploy hook",
+	store.TriggerRedeploy:      "Redeploy",
+}
+
 func (s *Server) auditApp(r *http.Request, action string, app *store.App, details string) {
 	s.audit(r, action, "app", app.ID, app.Name, details)
 }

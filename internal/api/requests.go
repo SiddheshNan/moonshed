@@ -103,7 +103,9 @@ func (s *Server) listRequests(w http.ResponseWriter, r *http.Request) error {
 
 type deploymentRow struct {
 	*store.Deployment
-	AppName string `json:"app_name"`
+	AppName   string `json:"app_name"`
+	ProjectID string `json:"project_id"`
+	GitURL    string `json:"git_url"`
 }
 
 // allDeployments lists deployments across every app for the Deployments page.
@@ -121,13 +123,17 @@ func (s *Server) allDeployments(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	names := map[string]string{}
+	byID := map[string]*store.App{}
 	for _, app := range apps {
-		names[app.ID] = app.Name
+		byID[app.ID] = app
 	}
 	rows := make([]deploymentRow, 0, len(list))
 	for _, d := range list {
-		rows = append(rows, deploymentRow{Deployment: d, AppName: names[d.AppID]})
+		row := deploymentRow{Deployment: d}
+		if app := byID[d.AppID]; app != nil {
+			row.AppName, row.ProjectID, row.GitURL = app.Name, app.ProjectID, app.GitURL
+		}
+		rows = append(rows, row)
 	}
 	return ok(w, rows)
 }

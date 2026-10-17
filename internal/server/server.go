@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/SiddheshNan/moonshed/internal/api"
@@ -89,16 +90,17 @@ func (s *Server) open() error {
 	github := githost.NewGitHub()
 	manager := deploy.NewManager(s.paths, s.store, engine.NewNative(), docker, github)
 	deps := &api.Deps{
-		Version:   version.Version,
-		PanelAddr: s.cfg.PanelAddr,
-		DevUI:     devUI,
-		Paths:     s.paths,
-		Store:     s.store,
-		Deploy:    manager,
-		Docker:    docker,
-		MetricsDB: s.metrics,
-		GitHub:    github,
-		Requests:  requests,
+		Version:    version.Version,
+		PanelAddr:  s.cfg.PanelAddr,
+		ConfigFile: filepath.Join(filepath.Base(s.paths.Root), "config", s.cfg.Env+".yaml"),
+		DevUI:      devUI,
+		Paths:      s.paths,
+		Store:      s.store,
+		Deploy:     manager,
+		Docker:     docker,
+		MetricsDB:  s.metrics,
+		GitHub:     github,
+		Requests:   requests,
 	}
 	s.panel = api.New(deps)
 	s.panel.ConfigureRecording()
