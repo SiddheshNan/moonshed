@@ -73,7 +73,7 @@ func (s *Server) authStatus(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	resp := map[string]any{"setup_required": n == 0, "version": s.Version}
+	resp := map[string]any{"setup_required": n == 0, "version": s.Version, "build": s.Build}
 	if a, err := s.authenticate(r); err == nil {
 		resp["user"] = a.user
 	}

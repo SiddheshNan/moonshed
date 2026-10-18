@@ -14,6 +14,7 @@ and assembles one bundle per target:
 Copy a bundle to the server and run:  ./moonshed install -e production
 """
 
+import argparse
 import os
 import platform
 import re
@@ -21,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -32,6 +34,8 @@ PACKAGE_JSON = UI / "package.json"
 VERSION_RE = re.compile(r'const Version = "([^"]*)"')
 PACKAGE_VERSION_RE = re.compile(r'("version":\s*)"[^"]*"')
 SEMVER_RE = re.compile(r"\d+\.\d+\.\d+")
+BUILD_RE = re.compile(r"\d{14}")
+BUILD_VAR = "github.com/SiddheshNan/moonshed/internal/version.Build"
 RELEASE_TARGETS = ["linux/amd64", "linux/arm64", "windows/amd64"]
 
 
@@ -102,12 +106,12 @@ def build_ui() -> Path:
     return dist
 
 
-def build_binary(go: str, target: str, out_dir: Path, ver: str) -> Path:
+def build_binary(go: str, target: str, out_dir: Path, ver: str, build: str) -> Path:
     goos, _, goarch = target.partition("/")
     binary = out_dir / goos / goarch / ("moonshed.exe" if goos == "windows" else "moonshed")
-    step(f"Building moonshed v{ver} for {target}")
+    step(f"Building moonshed v{ver}+{build} for {target}")
     run(
-        [go, "build", "-trimpath", "-ldflags", "-s -w", "-o", str(binary), "./cmd/moonshed"],
+        [go, "build", "-trimpath", "-ldflags", f"-s -w -X {BUILD_VAR}={build}", "-o", str(binary), "./cmd/moonshed"],
         ROOT,
         env={"CGO_ENABLED": "0", "GOOS": goos, "GOARCH": goarch},
     )
@@ -160,7 +164,12 @@ def confirm(prompt: str, default: bool = True) -> bool:
             return answer.startswith("y")
 
 
-def ask_version() -> str:
+def ask_version(given: str = None) -> str:
+    if given:
+        ver = given.removeprefix("v")
+        if not SEMVER_RE.fullmatch(ver):
+            raise BuildError(f'version must look like "1.2.0", got "{given}"')
+        return ver
     current = current_version()
     while True:
         ver = ask("Version", current).removeprefix("v")
@@ -188,13 +197,23 @@ def ask_targets() -> list:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Build Moonshed release bundles. Asks for anything not given; without a terminal it uses the defaults.")
+    parser.add_argument("--version", help='release version, e.g. "1.2.0" (default: the current one)')
+    parser.add_argument("--build", help="build ID as yyyyMMddHHmmss (default: the current UTC time)")
+    args = parser.parse_args()
+
+    build = args.build or datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    if not BUILD_RE.fullmatch(build):
+        print(f'error: build must look like "20261019143005", got "{build}"', file=sys.stderr)
+        return 1
+
     try:
-        ver = ask_version()
+        ver = ask_version(args.version)
         targets = ask_targets()
         out = Path(ask("Output directory", str(ROOT / "dist"))).expanduser().resolve()
         with_tests = confirm("Run tests?")
 
-        print(f"\n  version:  v{ver}\n  targets:  {', '.join(targets)}\n  output:   {out}\n  tests:    {'yes' if with_tests else 'no'}\n")
+        print(f"\n  version:  v{ver}\n  build:    {build}\n  targets:  {', '.join(targets)}\n  output:   {out}\n  tests:    {'yes' if with_tests else 'no'}\n")
         if not confirm("Build with these settings?"):
             print("aborted")
             return 1
@@ -216,7 +235,7 @@ def main() -> int:
         ui_dist = build_ui()
 
         with tempfile.TemporaryDirectory() as tmp:
-            binaries = {target: build_binary(go, target, Path(tmp), ver) for target in targets}
+            binaries = {target: build_binary(go, target, Path(tmp), ver, build) for target in targets}
             assemble(out, binaries, ui_dist)
     except BuildError as err:
         print(f"error: {err}", file=sys.stderr)

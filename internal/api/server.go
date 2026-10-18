@@ -34,6 +34,7 @@ import (
 
 type Deps struct {
 	Version    string
+	Build      string
 	PanelAddr  string
 	ConfigFile string
 	DevUI      *url.URL

@@ -45,7 +45,7 @@ export function App() {
   }
 
   return (
-    <Layout user={auth.data.user} version={auth.data.version}>
+    <Layout user={auth.data.user} version={auth.data.version} build={auth.data.build}>
       <OfflineBanner />
       <Routes>
         <Route path="/" element={<Dashboard />} />

@@ -15,6 +15,7 @@ func (s *Server) serverInfo(w http.ResponseWriter, r *http.Request) error {
 	dockerVersion, err := s.Docker.Version(r.Context())
 	return ok(w, map[string]any{
 		"version":        s.Version,
+		"build":          s.Build,
 		"stats":          s.Metrics.Server(),
 		"docker":         err == nil,
 		"docker_version": dockerVersion,

@@ -65,7 +65,7 @@ func main() {
 	case "reset-password":
 		err = resetPassword(paths, firstArg(args))
 	case "version":
-		fmt.Println(version.Version)
+		fmt.Println(version.Full())
 	default:
 		fmt.Print(usage)
 		os.Exit(2)

@@ -1,29 +1,45 @@
 # Upgrading
 
-1. [Build](/docs/installation#build) the new version.
+An upgrade replaces two things: the `moonshed` binary and the `runtime/web/` folder. Keep the rest of `runtime/` as it is. It holds your configuration, databases, apps and backups.
+
+1. Read the [changelog](/changelog) for the new version.
 2. Make a platform backup from **Settings › General**.
-3. Stop Moonshed, replace the `moonshed` binary and the `runtime/web/` folder, and start it again.
+3. Download the new release, stop Moonshed, copy the two parts over and start it again.
 
 ::: code-group
 
 ```bash [Linux]
+cd /tmp
+curl -fsSL https://github.com/SiddheshNan/moonshed/releases/latest/download/moonshed-linux-amd64.tar.gz | tar -xz
+
 sudo systemctl stop moonshed
-# copy the new moonshed binary and runtime/web/ into place
+sudo cp moonshed/moonshed /opt/moonshed/moonshed
+sudo rm -rf /opt/moonshed/runtime/web
+sudo cp -r moonshed/runtime/web /opt/moonshed/runtime/web
 sudo systemctl start moonshed
 ```
 
 ```powershell [Windows]
+# In an Administrator PowerShell
+cd $env:TEMP
+Invoke-WebRequest https://github.com/SiddheshNan/moonshed/releases/latest/download/moonshed-windows-amd64.zip -OutFile moonshed.zip
+Expand-Archive moonshed.zip -DestinationPath . -Force
+
 Stop-Service moonshed
-# copy the new moonshed.exe and runtime\web\ into place
+Copy-Item moonshed\moonshed.exe C:\moonshed\moonshed.exe -Force
+Remove-Item C:\moonshed\runtime\web -Recurse -Force
+Copy-Item moonshed\runtime\web C:\moonshed\runtime\web -Recurse
 Start-Service moonshed
 ```
 
 :::
 
-Keep the rest of `runtime/` as it is. It holds your databases, apps and backups.
+::: warning
+Don't unpack the new archive straight over your install. It contains a default `runtime/config/production.yaml` that would replace yours.
+:::
 
 Native apps are stopped and started again along with Moonshed. Docker containers keep running and are reattached.
 
 ::: warning Pre-release
-Until the first stable release, an upgrade can include breaking changes. Check the [changelog](https://github.com/SiddheshNan/moonshed/blob/main/CHANGELOG.md) before upgrading.
+Until the first stable release, an upgrade can include breaking changes.
 :::

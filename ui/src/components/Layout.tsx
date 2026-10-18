@@ -145,7 +145,7 @@ function Search() {
   );
 }
 
-export function Layout({ user, version, children }: { user: User; version: string; children: ReactNode }) {
+export function Layout({ user, version, build, children }: { user: User; version: string; build: string; children: ReactNode }) {
   const [opened, { toggle, close }] = useDisclosure();
   const { setColorScheme } = useMantineColorScheme();
   const scheme = useComputedColorScheme('dark');
@@ -170,9 +170,11 @@ export function Layout({ user, version, children }: { user: User; version: strin
             <Text fw={650} size="md" style={{ letterSpacing: '-0.01em' }}>
               Moonshed
             </Text>
-            <Badge variant="default" size="sm" radius="xl" fw={500} c="dimmed" visibleFrom="xs">
-              {version}
-            </Badge>
+            <Tooltip label={`Build ${build}`}>
+              <Badge variant="default" size="sm" radius="xl" fw={500} c="dimmed" visibleFrom="xs">
+                {version}
+              </Badge>
+            </Tooltip>
           </Group>
           <Group gap={6} wrap="nowrap">
             <UnstyledButton className="search-button" onClick={() => spotlight.open()}>

@@ -1,32 +1,39 @@
 # Installation
 
-There are no prebuilt releases yet, so you build Moonshed from source and copy the result to your server.
+Moonshed ships as one archive per platform: the binary, a default configuration file and the UI.
 
-## Build
+| Platform | Download |
+|---|---|
+| Linux x86-64 | `moonshed-linux-amd64.tar.gz` |
+| Linux ARM64 | `moonshed-linux-arm64.tar.gz` |
+| Windows x86-64 | `moonshed-windows-amd64.zip` |
 
-You need Go 1.26+, Node 20+ and Python 3 on the machine you build on.
-
-```bash
-git clone https://github.com/SiddheshNan/moonshed.git
-cd moonshed
-./scripts/build.py
-```
-
-The script asks for the version, the target platforms, the output folder and whether to run the tests. Press Enter to accept the defaults. It writes one bundle per target:
-
-```
-dist/linux-amd64/
-  moonshed
-  runtime/
-    config/production.yaml
-    web/                      the UI
-```
-
-The binary is built without CGO, so you can build a Windows or Linux bundle from any machine.
+All releases are on the [GitHub releases page](https://github.com/SiddheshNan/moonshed/releases), with a `SHA256SUMS` file to check the downloads against.
 
 ## Install on the server
 
-Copy the bundle to your server and check `runtime/config/production.yaml` (see [Configuration file](/docs/reference/configuration)). Then install it as a service:
+Download the latest release and unpack it where Moonshed should live. Everything it stores goes into a `runtime/` folder next to the binary.
+
+::: code-group
+
+```bash [Linux]
+cd /opt
+curl -fsSL https://github.com/SiddheshNan/moonshed/releases/latest/download/moonshed-linux-amd64.tar.gz | sudo tar -xz
+cd moonshed
+```
+
+```powershell [Windows]
+# In an Administrator PowerShell
+Invoke-WebRequest https://github.com/SiddheshNan/moonshed/releases/latest/download/moonshed-windows-amd64.zip -OutFile moonshed.zip
+Expand-Archive moonshed.zip -DestinationPath C:\
+cd C:\moonshed
+```
+
+:::
+
+On an ARM server, download `moonshed-linux-arm64.tar.gz` instead.
+
+Check `runtime/config/production.yaml` (see [Configuration file](/docs/reference/configuration)), then install Moonshed as a service:
 
 ::: code-group
 
@@ -35,7 +42,6 @@ sudo ./moonshed install -e production
 ```
 
 ```powershell [Windows]
-# In an Administrator PowerShell
 .\moonshed.exe install -e production
 ```
 
@@ -70,3 +76,15 @@ sudo ./moonshed uninstall
 ```
 
 This stops and removes the service. The `runtime/` folder is left as it is.
+
+## Build from source
+
+You need Go 1.26+, Node 20+ and Python 3.
+
+```bash
+git clone https://github.com/SiddheshNan/moonshed.git
+cd moonshed
+./scripts/build.py
+```
+
+The script asks for the version, the target platforms, the output folder and whether to run the tests. Press Enter to accept the defaults. It writes one folder per platform into `dist/`, laid out the same as a release archive. The binary is built without CGO, so you can build for any platform from any machine.

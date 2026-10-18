@@ -59,18 +59,20 @@ restart_unhealthy: true
 
 ## Install it on your server
 
-<p class="lead">Build a bundle, copy it over and register the service. Then open the panel on port 5050.</p>
+<p class="lead">Download the release, register the service, then open the panel on port 5050.</p>
 
 ::: code-group
 
 ```bash [Linux]
-./scripts/build.py
-sudo ./moonshed install -e production
+cd /opt
+curl -fsSL https://github.com/SiddheshNan/moonshed/releases/latest/download/moonshed-linux-amd64.tar.gz | sudo tar -xz
+cd moonshed && sudo ./moonshed install -e production
 ```
 
 ```powershell [Windows]
-python scripts/build.py
-.\moonshed.exe install -e production
+Invoke-WebRequest https://github.com/SiddheshNan/moonshed/releases/latest/download/moonshed-windows-amd64.zip -OutFile moonshed.zip
+Expand-Archive moonshed.zip -DestinationPath C:\
+cd C:\moonshed; .\moonshed.exe install -e production
 ```
 
 :::
