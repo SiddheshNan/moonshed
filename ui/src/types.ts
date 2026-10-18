@@ -12,6 +12,7 @@ export interface User {
 export interface AuthStatus {
   setup_required: boolean;
   version: string;
+  build: string;
   user?: User;
 }
 
@@ -262,6 +263,7 @@ export interface ProxyStatus {
 
 export interface ServerInfo {
   version: string;
+  build: string;
   stats: ServerStats | null;
   docker: boolean;
   docker_version: string;

@@ -497,7 +497,7 @@ moonshed version
 - **`--runtime` (or `RUNTIME_DIR`):** the runtime folder. Defaults to `runtime/` next to the binary, then `./runtime`.
 - **Install:** copy a release bundle (binary + `runtime/config/production.yaml` + `runtime/web/`), run `moonshed install -e production`, open the UI.
 - **Upgrade:** replace the binary and `runtime/web/`, then restart the service. Apps restart with it.
-- **Release builds:** `scripts/build.py` writes the version, optionally vets and tests, builds the UI and cross-compiles one bundle per platform into `dist/<os>-<arch>/`.
+- **Release builds:** `scripts/build.py` writes the version, stamps a build ID (UTC `yyyyMMddHHmmss`, so `moonshed version` prints e.g. `0.1.0+20261019143005`), optionally vets and tests, builds the UI and cross-compiles one bundle per platform into `dist/<os>-<arch>/`. Pushing a `vX.Y.Z` tag runs the same build in GitHub Actions and publishes the archives as a release.
 - **Development:** `development.yaml` sets `ui` to the Vite dev server, so the panel forwards every non-API request to it and UI changes show up live, on `:5050` and on the panel's domain alike.
 
 ---

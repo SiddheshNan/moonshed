@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      # Without a terminal, build.py vets, tests and builds every release target into dist/.
+      - name: Build
+        run: |
+          build="$(date -u +%Y%m%d%H%M%S)"
+          echo "BUILD=$build" >> "$GITHUB_ENV"
+          python3 scripts/build.py --version "$GITHUB_REF_NAME" --build "$build"
+
+      # Archive names carry no version, so releases/latest/download/<name> always works.
+      # Each one unpacks to a moonshed/ folder.
+      - name: Package
+        working-directory: dist
+        run: |
+          for target in */; do
+            target="${target%/}"
+            mv "$target" moonshed
+            if [[ "$target" == windows-* ]]; then
+              zip -qr "moonshed-$target.zip" moonshed
+            else
+              tar -czf "moonshed-$target.tar.gz" moonshed
+            fi
+            rm -rf moonshed
+          done
+          sha256sum *.tar.gz *.zip > SHA256SUMS
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Re-running the workflow for a tag replaces the release's files with the new build.
+        run: |
+          title="Moonshed $GITHUB_REF_NAME (build $BUILD)"
+          files=(dist/*.tar.gz dist/*.zip dist/SHA256SUMS)
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+            gh release edit "$GITHUB_REF_NAME" --title "$title"
+          else
+            gh release create "$GITHUB_REF_NAME" "${files[@]}" --title "$title" --generate-notes --verify-tag
+          fi

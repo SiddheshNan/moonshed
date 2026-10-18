@@ -91,6 +91,7 @@ func (s *Server) open() error {
 	manager := deploy.NewManager(s.paths, s.store, engine.NewNative(), docker, github)
 	deps := &api.Deps{
 		Version:    version.Version,
+		Build:      version.Build,
 		PanelAddr:  s.cfg.PanelAddr,
 		ConfigFile: filepath.Join(filepath.Base(s.paths.Root), "config", s.cfg.Env+".yaml"),
 		DevUI:      devUI,
@@ -119,7 +120,7 @@ func (s *Server) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	d := s.deps
-	slog.Info("starting", "version", version.Version, "env", s.cfg.Env, "pid", os.Getpid(), "runtime", s.paths.Root)
+	slog.Info("starting", "version", version.Full(), "env", s.cfg.Env, "pid", os.Getpid(), "runtime", s.paths.Root)
 	if err := d.Deploy.Run(ctx, s.cfg.Builds); err != nil {
 		return err
 	}

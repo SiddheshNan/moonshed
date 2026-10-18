@@ -59,21 +59,18 @@ Platforms like Dokploy and Coolify are great, but they bring a stack with them: 
 
 ## Quick start
 
-There are no prebuilt releases yet. Build a bundle with Go 1.26+, Node 20+ and Python 3:
+Download the latest release on your server and install it as a service:
 
 ```bash
-git clone https://github.com/SiddheshNan/moonshed.git
+cd /opt
+curl -fsSL https://github.com/SiddheshNan/moonshed/releases/latest/download/moonshed-linux-amd64.tar.gz | sudo tar -xz
 cd moonshed
-./scripts/build.py
+sudo ./moonshed install -e production
 ```
 
-Copy `dist/<os>-<arch>/` to your server, check `runtime/config/production.yaml`, then as root or Administrator:
+Open `http://<server>:5050` and create the admin account.
 
-```bash
-./moonshed install -e production
-```
-
-Open `http://<server>:5050` and create the admin account. See the [installation guide](https://moonshed.siddhesh.me/docs/installation) for Windows, putting the panel behind HTTPS, and upgrading.
+Releases are built for Linux (x86-64 and ARM64) and Windows (x86-64). See the [installation guide](https://moonshed.siddhesh.me/docs/installation) for Windows, putting the panel behind HTTPS, upgrading, and building from source.
 
 ## Deploy an app
 
