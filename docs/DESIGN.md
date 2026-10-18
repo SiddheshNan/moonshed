@@ -360,12 +360,26 @@ Every change is recorded with who did it (user, API token, or webhook), when, fr
 
 ## 10. Backups
 
-- **What:**
-  - The platform DB (`VACUUM INTO`).
-  - Each app's `shared/` folder (`tar.gz` on both OSes).
-- **When:** a cron-style schedule per app plus one for the platform, or manually.
-- **Where:** a local folder (`backups/` or a user-chosen path). Keep the last N copies.
-- **Restore:** from the UI. Stop the app, replace `shared/`, start the app.
+**App backups** pick any of four parts, each a switch: **Code** (the deployed version), **Data** (the persisted paths), **Env vars** (the Environment tab) and **Logs** (app logs plus the deploy log). The archive unpacks to a folder that looks like the app itself:
+
+```
+myapp_2026-10-18_03-00-00.tar.gz
+└── myapp/
+    ├── app.py, moonshed.yaml …   Code: exactly as deployed
+    ├── data/, config.ini         Data: each persisted path in its real place
+    ├── .env                      Env vars, as KEY=value (".env.moonshed" if the code has its own .env)
+    └── .moonshed/
+        ├── logs/                 Logs
+        └── backup.json           what's included, release, commit, time
+```
+
+- **Back up now** asks which parts to include. A **schedule** has an on/off switch; when on, it needs a cron expression and its own choice of parts, and keeps the last N backups.
+- **Restore** offers the parts the backup has: Data replaces the persisted paths (the app is stopped meanwhile), Env vars replace the Environment tab, and Code is deployed as a new deployment (trigger "restore"), even if that version is no longer among the kept versions. Logs are for download only.
+- **Downloads** that include env vars warn that the `.env` is plain text.
+
+**Platform backups** hold the database (`VACUUM INTO`) and the key that decrypts it, on their own schedule (same on/off switch) or on demand. Restore by stopping Moonshed and extracting the archive into `runtime/data/`.
+
+Backups live in `runtime/backups/`.
 
 ---
 
@@ -389,12 +403,12 @@ users          (id, username, password_hash, created_at)
 sessions       (token_hash, user_id, expires_at)
 api_tokens     (id, user_id, name, token_hash, last_used_at, created_at)
 settings       (key, value)     proxy_enabled, acme_email, panel_domain, panel_tls, proxy_trusted_proxies,
-                                proxy_global_options, proxy_extra_sites, backup_cron, backup_keep
+                                proxy_global_options, proxy_extra_sites, backup_enabled, backup_cron, backup_keep
 
 apps           (id, name, runtime[''|native|docker], port, source[upload|git],
                 git_url, git_branch, git_subdir, git_token (encrypted), webhook_secret,
                 run_as_user, run_as_password (encrypted, Windows only),
-                keep_bundles, log_retention_days, backup_cron, backup_keep,
+                keep_bundles, log_retention_days, backup_enabled, backup_cron, backup_keep, backup_parts,
                 config (JSON: settings changed in the UI on top of moonshed.yaml),
                 current_release_id, desired_state[running|stopped], created_at)
 env_vars       (app_id, key, value (encrypted))
@@ -410,7 +424,7 @@ deployments    (id, app_id, bundle_id, release_id, trigger, status, error,
 
 incidents      (id, app_id, down_at, up_at, reason)
 uptime         (app_id, hour, ok, total)                      one row per app per hour, 7 days
-backups        (id, app_id (NULL = platform), file, size, status, error, created_at)
+backups        (id, app_id (NULL = platform), file, size, status, error, parts, created_at)
 projects       (id, name, description, created_at)
 audit_log      (id, ts, actor_type, actor_id, actor_name, ip, action, target_type, target_id, target_name, details)
 git_credentials      (id, name, host, username, token (encrypted), created_at)

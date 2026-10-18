@@ -199,4 +199,13 @@ ALTER TABLE domains ADD COLUMN advanced TEXT NOT NULL DEFAULT '';
 ALTER TABLE apps ADD COLUMN config TEXT NOT NULL DEFAULT '{}';
 UPDATE apps SET config = '{"restart_unhealthy":true}' WHERE auto_restart = 1;
 ALTER TABLE apps DROP COLUMN auto_restart;
+`,
+	// Backups choose what to include, and schedules have an on/off switch instead of
+	// meaning "off" when the cron expression is empty. Older backups only held data.
+	`
+ALTER TABLE apps ADD COLUMN backup_enabled INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE apps ADD COLUMN backup_parts TEXT NOT NULL DEFAULT '{"code":true,"data":true,"env":true}';
+UPDATE apps SET backup_enabled = 1 WHERE backup_cron != '';
+ALTER TABLE backups ADD COLUMN parts TEXT NOT NULL DEFAULT '{"data":true}';
+INSERT INTO settings (key, value) SELECT 'backup_enabled', 'true' FROM settings WHERE key = 'backup_cron' AND value != '';
 `}

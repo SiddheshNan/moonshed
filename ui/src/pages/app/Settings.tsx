@@ -1,11 +1,11 @@
 import { useState, type ReactNode } from 'react';
 import { Button, Card, Group, PasswordInput, SimpleGrid, Stack, Text, TextInput } from '@mantine/core';
-import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 
 import { api, queryClient } from '../../api';
+import { ConfirmDelete } from '../../components/ConfirmDelete';
 import type { App, ServerInfo } from '../../types';
 
 export function useSave(app: App) {
@@ -114,6 +114,7 @@ function RunAs({ app }: { app: App }) {
 
 function Danger({ app }: { app: App }) {
   const navigate = useNavigate();
+  const [confirming, setConfirming] = useState(false);
   const remove = useMutation({
     mutationFn: () => api.delete(`/apps/${app.id}`),
     onSuccess: () => {
@@ -132,23 +133,20 @@ function Danger({ app }: { app: App }) {
             Stops the app and deletes its versions, data, logs and backups.
           </Text>
         </div>
-        <Button
-          color="red"
-          variant="light"
-          loading={remove.isPending}
-          onClick={() =>
-            modals.openConfirmModal({
-              title: `Delete ${app.name}?`,
-              children: <Text size="sm">This can't be undone.</Text>,
-              labels: { confirm: 'Delete', cancel: 'Cancel' },
-              confirmProps: { color: 'red' },
-              onConfirm: () => remove.mutate(),
-            })
-          }
-        >
+        <Button color="red" variant="light" onClick={() => setConfirming(true)}>
           Delete
         </Button>
       </Group>
+      <ConfirmDelete
+        opened={confirming}
+        onClose={() => setConfirming(false)}
+        title={`Delete ${app.name}?`}
+        name={app.name}
+        loading={remove.isPending}
+        onConfirm={() => remove.mutate()}
+      >
+        The app is stopped, and its versions, persisted data, logs and backups are deleted. This can't be undone.
+      </ConfirmDelete>
     </Card>
   );
 }

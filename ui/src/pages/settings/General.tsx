@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Anchor, Button, Card, Code, Group, NumberInput, SimpleGrid, Stack, Text, TextInput } from '@mantine/core';
+import { Anchor, Button, Card, Code, Group, NumberInput, SimpleGrid, Stack, Switch, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
@@ -54,7 +54,12 @@ function GeneralSettings() {
       }
       // The backup schedule is saved separately, so keep whatever is stored.
       const stored = queryClient.getQueryData<SettingsResponse>(['settings'])?.settings;
-      return api.put<SettingsResponse>('/settings', { ...s, backup_cron: stored?.backup_cron ?? s.backup_cron, backup_keep: stored?.backup_keep ?? s.backup_keep });
+      return api.put<SettingsResponse>('/settings', {
+        ...s,
+        backup_enabled: stored?.backup_enabled ?? s.backup_enabled,
+        backup_cron: stored?.backup_cron ?? s.backup_cron,
+        backup_keep: stored?.backup_keep ?? s.backup_keep,
+      });
     },
     onSuccess: (res) => {
       queryClient.setQueryData(['settings'], res);
@@ -143,53 +148,75 @@ function GeneralSettings() {
 function PlatformBackups() {
   const settings = useQuery({ queryKey: ['settings'], queryFn: () => api.get<SettingsResponse>('/settings') });
   const backups = useQuery({ queryKey: ['backups', 'platform'], queryFn: () => api.get<Backup[]>('/platform/backups') });
-  const [cron, setCron] = useState<string | null>(null);
-  const [keep, setKeep] = useState<number | null>(null);
   const create = useMutation({
     mutationFn: () => api.post('/platform/backups'),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['backups', 'platform'] }),
     onError: (err) => notifications.show({ color: 'red', message: err.message }),
   });
-  const stored = settings.data?.settings;
+
+  return (
+    <Stack gap="lg">
+      <Card padding={0}>
+        <Group justify="space-between" className="panel-header" wrap="nowrap">
+          <div>
+            <Text fw={600}>Platform backups</Text>
+            <Text size="sm" c="dimmed">
+              Database and encryption key. To restore, stop Moonshed and extract the archive into <Code>runtime/data/</Code>.
+            </Text>
+          </div>
+          <Button variant="default" onClick={() => create.mutate()} loading={create.isPending}>
+            Back up now
+          </Button>
+        </Group>
+        <BackupTable backups={backups.data ?? []} />
+      </Card>
+      {settings.data && <PlatformSchedule key={JSON.stringify(settings.data.settings)} stored={settings.data.settings} />}
+    </Stack>
+  );
+}
+
+function PlatformSchedule({ stored }: { stored: Settings }) {
+  const [enabled, setEnabled] = useState(stored.backup_enabled);
+  const [cron, setCron] = useState(stored.backup_cron);
+  const [keep, setKeep] = useState(stored.backup_keep);
   const save = useMutation({
-    mutationFn: () => api.put<SettingsResponse>('/settings', { ...stored, backup_cron: cron ?? stored?.backup_cron, backup_keep: keep ?? stored?.backup_keep }),
+    mutationFn: () => api.put<SettingsResponse>('/settings', { ...stored, backup_enabled: enabled, backup_cron: cron, backup_keep: keep }),
     onSuccess: (res) => {
       queryClient.setQueryData(['settings'], res);
       notifications.show({ color: 'green', message: 'Schedule saved' });
     },
     onError: (err) => notifications.show({ color: 'red', message: err.message }),
   });
+  const changed = enabled !== stored.backup_enabled || cron !== stored.backup_cron || keep !== stored.backup_keep;
 
   return (
     <Card padding={0}>
-      <Group justify="space-between" p="md">
-        <div>
-          <Text fw={600}>Platform backups</Text>
-          <Text size="sm" c="dimmed">
-            Database and encryption key. To restore, stop Moonshed and extract the archive into <Code>runtime/data/</Code>.
-          </Text>
-        </div>
-        <Button variant="default" onClick={() => create.mutate()} loading={create.isPending}>
-          Back up now
-        </Button>
-      </Group>
-      {stored && (
-        <Group align="flex-end" px="md" pb="md">
-          <TextInput
-            label="Schedule"
-            description="Cron, server time. Empty = off."
-            placeholder="0 2 * * *"
-            value={cron ?? stored.backup_cron}
-            onChange={(e) => setCron(e.currentTarget.value)}
-            w={260}
-          />
-          <NumberInput label="Keep" min={1} value={keep ?? stored.backup_keep} onChange={(v) => setKeep(Number(v) || 1)} w={120} />
-          <Button variant="default" onClick={() => save.mutate()} loading={save.isPending}>
+      <Group justify="space-between" className="panel-header">
+        <Text fw={600}>Platform backup schedule</Text>
+        {changed && (
+          <Button size="sm" onClick={() => save.mutate()} loading={save.isPending} disabled={enabled && !cron.trim()}>
             Save
           </Button>
-        </Group>
-      )}
-      <BackupTable backups={backups.data ?? []} restorable={false} />
+        )}
+      </Group>
+      <Stack p="lg">
+        <Switch label="Back up on a schedule" checked={enabled} onChange={(e) => setEnabled(e.currentTarget.checked)} />
+        {enabled && (
+          <Group align="flex-start">
+            <TextInput
+              label="Cron expression"
+              description="Server time, e.g. 0 2 * * * for 2:00 every day"
+              placeholder="0 2 * * *"
+              required
+              value={cron}
+              onChange={(e) => setCron(e.currentTarget.value)}
+              error={!cron.trim() ? 'Required' : undefined}
+              w={300}
+            />
+            <NumberInput label="Keep" description="Newest backups" min={1} value={keep} onChange={(v) => setKeep(Number(v) || 1)} w={140} />
+          </Group>
+        )}
+      </Stack>
     </Card>
   );
 }

@@ -55,6 +55,7 @@ var triggerLabels = map[string]string{
 	store.TriggerGitLabWebhook: "GitLab webhook",
 	store.TriggerDeployHook:    "Deploy hook",
 	store.TriggerRedeploy:      "Redeploy",
+	store.TriggerRestore:       "Backup restore",
 }
 
 func (s *Server) auditApp(r *http.Request, action string, app *store.App, details string) {

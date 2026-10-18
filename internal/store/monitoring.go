@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 )
@@ -90,19 +91,35 @@ const (
 )
 
 type Backup struct {
-	ID        string `json:"id"`
-	AppID     string `json:"app_id"`
-	File      string `json:"file"`
-	Size      int64  `json:"size"`
-	Status    string `json:"status"`
-	Error     string `json:"error"`
-	CreatedAt Time   `json:"created_at"`
+	ID        string      `json:"id"`
+	AppID     string      `json:"app_id"`
+	File      string      `json:"file"`
+	Size      int64       `json:"size"`
+	Status    string      `json:"status"`
+	Error     string      `json:"error"`
+	Parts     BackupParts `json:"parts"`
+	CreatedAt Time        `json:"created_at"`
 }
+
+// BackupParts says what an app backup includes.
+type BackupParts struct {
+	Code bool `json:"code"`
+	Data bool `json:"data"`
+	Env  bool `json:"env"`
+	Logs bool `json:"logs"`
+}
+
+func (p BackupParts) Any() bool { return p.Code || p.Data || p.Env || p.Logs }
 
 func (s *Store) CreateBackup(b *Backup) error {
 	b.ID, b.CreatedAt = NewID(), Now()
 	b.Status = BackupRunning
-	_, err := s.db.Exec("INSERT INTO backups (id, app_id, file, status, created_at) VALUES (?, ?, ?, ?, ?)", b.ID, nullID(b.AppID), b.File, b.Status, b.CreatedAt)
+	parts, err := json.Marshal(b.Parts)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec("INSERT INTO backups (id, app_id, file, status, parts, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+		b.ID, nullID(b.AppID), b.File, b.Status, string(parts), b.CreatedAt)
 	return err
 }
 
@@ -119,27 +136,35 @@ func (s *Store) Backups(appID string) ([]*Backup, error) {
 		where = "app_id = ?"
 		args = append(args, appID)
 	}
-	rows, err := s.db.Query("SELECT id, COALESCE(app_id, ''), file, size, status, error, created_at FROM backups WHERE "+where+" ORDER BY id DESC", args...)
+	rows, err := s.db.Query("SELECT "+backupColumns+" FROM backups WHERE "+where+" ORDER BY id DESC", args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var out []*Backup
 	for rows.Next() {
-		var b Backup
-		if err := rows.Scan(&b.ID, &b.AppID, &b.File, &b.Size, &b.Status, &b.Error, &b.CreatedAt); err != nil {
+		b, err := scanBackup(rows)
+		if err != nil {
 			return nil, err
 		}
-		out = append(out, &b)
+		out = append(out, b)
 	}
 	return out, rows.Err()
 }
 
 func (s *Store) Backup(id string) (*Backup, error) {
+	return scanBackup(s.db.QueryRow("SELECT "+backupColumns+" FROM backups WHERE id = ?", id))
+}
+
+const backupColumns = "id, COALESCE(app_id, ''), file, size, status, error, parts, created_at"
+
+func scanBackup(row interface{ Scan(...any) error }) (*Backup, error) {
 	var b Backup
-	err := s.db.QueryRow("SELECT id, COALESCE(app_id, ''), file, size, status, error, created_at FROM backups WHERE id = ?", id).
-		Scan(&b.ID, &b.AppID, &b.File, &b.Size, &b.Status, &b.Error, &b.CreatedAt)
-	return &b, notFound(err)
+	var parts string
+	if err := row.Scan(&b.ID, &b.AppID, &b.File, &b.Size, &b.Status, &b.Error, &parts, &b.CreatedAt); err != nil {
+		return nil, notFound(err)
+	}
+	return &b, json.Unmarshal([]byte(parts), &b.Parts)
 }
 
 func (s *Store) DeleteBackup(id string) error {

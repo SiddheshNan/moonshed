@@ -1,13 +1,15 @@
-// Package backup archives each app's shared/ folder and the platform database.
+// Package backup archives apps (code, persisted data, env vars, logs) and the platform database.
 package backup
 
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,8 +22,9 @@ import (
 )
 
 const (
-	SettingCron = "backup_cron"
-	SettingKeep = "backup_keep"
+	SettingEnabled = "backup_enabled"
+	SettingCron    = "backup_cron"
+	SettingKeep    = "backup_keep"
 )
 
 // Apps is the slice of the deploy manager backups need for restores.
@@ -29,6 +32,8 @@ type Apps interface {
 	Status(*store.App) engine.Status
 	Start(*store.App) error
 	Stop(*store.App) error
+	Restart(*store.App) error
+	DeployUpload(app *store.App, r io.Reader, trigger string) (*store.Deployment, error)
 }
 
 type Service struct {
@@ -84,7 +89,7 @@ func (s *Service) Reload() error {
 		return err
 	}
 	for _, app := range apps {
-		if app.BackupCron == "" {
+		if !app.BackupEnabled || app.BackupCron == "" {
 			continue
 		}
 		appID := app.ID
@@ -92,11 +97,15 @@ func (s *Service) Reload() error {
 			slog.Error("backup schedule", "app", app.Name, "err", err)
 		}
 	}
+	enabled, err := s.store.Setting(SettingEnabled)
+	if err != nil {
+		return err
+	}
 	spec, err := s.store.Setting(SettingCron)
 	if err != nil {
 		return err
 	}
-	if spec != "" {
+	if enabled == "true" && spec != "" {
 		if err := s.schedule(spec, func() {
 			_, err := s.BackupPlatform()
 			s.logErr(err)
@@ -121,7 +130,7 @@ func (s *Service) runScheduledApp(appID string) {
 	if err != nil {
 		return
 	}
-	_, err = s.BackupApp(app)
+	_, err = s.BackupApp(app, app.BackupParts)
 	s.logErr(err)
 }
 
@@ -129,26 +138,6 @@ func (s *Service) logErr(err error) {
 	if err != nil {
 		slog.Error("backup", "err", err)
 	}
-}
-
-// BackupApp starts archiving the app's shared/ folder in the background.
-func (s *Service) BackupApp(app *store.App) (*store.Backup, error) {
-	if !s.claim(app.ID) {
-		return nil, errors.New("a backup for this app is already running")
-	}
-	dir := s.paths.AppBackups(app.Name)
-	b := &store.Backup{AppID: app.ID, File: filepath.Join(dir, timestamp()+".tar.gz")}
-	if err := s.start(b, dir); err != nil {
-		s.release(app.ID)
-		return nil, err
-	}
-	go func() {
-		defer s.release(app.ID)
-		root := s.paths.App(app.Name).Root
-		s.finish(b, s.write(b.File, func(f *os.File) error { return archive.TarGz(f, root, "shared") }))
-		s.prune(app.ID, app.BackupKeep)
-	}()
-	return b, nil
 }
 
 // BackupPlatform snapshots the database (with VACUUM INTO, safe while running) and the
@@ -159,7 +148,7 @@ func (s *Service) BackupPlatform() (*store.Backup, error) {
 	}
 	defer s.release("")
 	dir := s.paths.PlatformBackups()
-	b := &store.Backup{File: filepath.Join(dir, timestamp()+".tar.gz")}
+	b := &store.Backup{File: filepath.Join(dir, fmt.Sprintf("platform_%s.tar.gz", timestamp()))}
 	if err := s.start(b, dir); err != nil {
 		return nil, err
 	}
@@ -185,58 +174,6 @@ func (s *Service) BackupPlatform() (*store.Backup, error) {
 	}
 	s.prune("", n)
 	return b, err
-}
-
-// RestoreApp replaces the app's shared/ folder with the backup's contents.
-// The app is stopped during the restore and started again if it was running.
-func (s *Service) RestoreApp(app *store.App, b *store.Backup) error {
-	if b.AppID != app.ID || b.Status != store.BackupSuccess {
-		return errors.New("backup can't be restored")
-	}
-	if !s.claim(app.ID) {
-		return errors.New("a backup for this app is running")
-	}
-	defer s.release(app.ID)
-
-	wasRunning := s.apps.Status(app).State == engine.StateRunning
-	if wasRunning {
-		if err := s.apps.Stop(app); err != nil {
-			return err
-		}
-	}
-	shared := s.paths.App(app.Name).Shared()
-	staging, err := os.MkdirTemp(s.paths.App(app.Name).Root, "restore-")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(staging)
-
-	err = func() error {
-		f, err := os.Open(b.File)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		if err := archive.UntarGz(f, staging); err != nil {
-			return err
-		}
-		old := shared + ".old"
-		os.RemoveAll(old)
-		if err := os.Rename(shared, old); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-		if err := os.Rename(filepath.Join(staging, "shared"), shared); err != nil {
-			os.Rename(old, shared)
-			return err
-		}
-		return os.RemoveAll(old)
-	}()
-	if wasRunning {
-		if startErr := s.apps.Start(app); err == nil {
-			err = startErr
-		}
-	}
-	return err
 }
 
 func (s *Service) Delete(b *store.Backup) error {
@@ -323,13 +260,17 @@ func (s *Service) release(id string) {
 }
 
 func timestamp() string {
-	return time.Now().Format("20060102-150405")
+	return time.Now().Format("2006-01-02_15-04-05")
 }
 
-// FileName is the download name for a backup.
+// FileName is the download name for a backup. Older backups were named by time only.
 func FileName(appName string, b *store.Backup) string {
 	if appName == "" {
 		appName = "platform"
 	}
-	return fmt.Sprintf("%s-%s", appName, filepath.Base(b.File))
+	name := filepath.Base(b.File)
+	if strings.HasPrefix(name, appName+"_") {
+		return name
+	}
+	return fmt.Sprintf("%s-%s", appName, name)
 }

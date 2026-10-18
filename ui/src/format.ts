@@ -68,6 +68,7 @@ const triggerLabels: Record<string, string> = {
   gitlab_webhook: 'GitLab webhook',
   deploy_hook: 'Deploy hook',
   redeploy: 'Redeploy',
+  restore: 'Backup restore',
 };
 
 // triggerLabel names what started a deployment.

@@ -36,7 +36,8 @@ type tree struct {
 
 func (t *tree) start(cmd *exec.Cmd, u *User) error {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	if u != nil {
+	// Switching to the user we already are would still set groups, which needs root.
+	if u != nil && int(u.uid) != os.Getuid() {
 		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: u.uid, Gid: u.gid, Groups: u.groups}
 	}
 	if err := cmd.Start(); err != nil {
@@ -88,6 +89,24 @@ func LookupUser(name, _ string) (*User, error) {
 }
 
 func (u *User) Close() {}
+
+// CanRunAs reports why apps can't be started as name: only root can start processes as
+// another user.
+func CanRunAs(name string) error {
+	u, err := user.Lookup(name)
+	if err != nil {
+		return fmt.Errorf("no user named %s on this server", name)
+	}
+	if u.Uid == strconv.Itoa(os.Getuid()) || os.Geteuid() == 0 {
+		return nil
+	}
+	me, _ := user.Current()
+	current := "this user"
+	if me != nil {
+		current = me.Username
+	}
+	return fmt.Errorf("Moonshed runs as %s, not root, so it can't start apps as %s", current, name)
+}
 
 func (u *User) environ() []string {
 	return append(os.Environ(), "HOME="+u.home, "USER="+u.Name, "LOGNAME="+u.Name)

@@ -125,6 +125,7 @@ const (
 	TriggerGitLabWebhook = "gitlab_webhook" // push to the app's own hook URL from GitLab
 	TriggerDeployHook    = "deploy_hook"    // the app's hook URL called with ?token=
 	TriggerRedeploy      = "redeploy"       // an earlier version redeployed
+	TriggerRestore       = "restore"        // code restored from a backup
 )
 
 type Deployment struct {

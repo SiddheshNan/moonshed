@@ -25,6 +25,7 @@ type settings struct {
 	TrustedProxies []string `json:"trusted_proxies"`
 	GlobalOptions  string   `json:"global_options"`
 	ExtraSites     string   `json:"extra_sites"`
+	BackupEnabled  bool     `json:"backup_enabled"`
 	BackupCron     string   `json:"backup_cron"`
 	BackupKeep     int      `json:"backup_keep"`
 }
@@ -43,6 +44,7 @@ func (s *Server) loadSettings() (*settings, error) {
 		TrustedProxies: strings.Fields(m[proxy.SettingTrustedProxies]),
 		GlobalOptions:  m[proxy.SettingGlobalOptions],
 		ExtraSites:     m[proxy.SettingExtraSites],
+		BackupEnabled:  m[backup.SettingEnabled] == "true",
 		BackupCron:     m[backup.SettingCron],
 		BackupKeep:     cmp.Or(keep, 7),
 	}, nil
@@ -152,6 +154,10 @@ func (s *Server) updateSettings(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	in.BackupCron = strings.TrimSpace(in.BackupCron)
+	if in.BackupEnabled && in.BackupCron == "" {
+		return badRequest("scheduled backups need a cron expression")
+	}
 	if err := backup.ValidateCron(in.BackupCron); err != nil {
 		return badRequest("invalid backup schedule: %v", err)
 	}
@@ -173,6 +179,7 @@ func (s *Server) updateSettings(w http.ResponseWriter, r *http.Request) error {
 		proxy.SettingTrustedProxies: strings.Join(in.TrustedProxies, " "),
 		proxy.SettingGlobalOptions:  in.GlobalOptions,
 		proxy.SettingExtraSites:     in.ExtraSites,
+		backup.SettingEnabled:       strconv.FormatBool(in.BackupEnabled),
 		backup.SettingCron:          in.BackupCron,
 		backup.SettingKeep:          strconv.Itoa(in.BackupKeep),
 	}
@@ -249,12 +256,33 @@ func (s *Server) createAppBackup(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	b, err := s.Backups.BackupApp(app)
+	// Without a body it backs up what the app's schedule would.
+	parts := app.BackupParts
+	if r.ContentLength != 0 {
+		if err := decode(r, &parts); err != nil {
+			return err
+		}
+	}
+	b, err := s.Backups.BackupApp(app, parts)
 	if err != nil {
 		return errorf(http.StatusConflict, "%v", err)
 	}
-	s.auditApp(r, "backup.create", app, "")
+	s.auditApp(r, "backup.create", app, partsLabel(parts))
 	return writeJSON(w, http.StatusAccepted, b)
+}
+
+// partsLabel names backup parts for the audit log, e.g. "code, data, env vars".
+func partsLabel(p store.BackupParts) string {
+	var names []string
+	for _, part := range []struct {
+		on   bool
+		name string
+	}{{p.Code, "code"}, {p.Data, "data"}, {p.Env, "env vars"}, {p.Logs, "logs"}} {
+		if part.on {
+			names = append(names, part.name)
+		}
+	}
+	return strings.Join(names, ", ")
 }
 
 func (s *Server) createPlatformBackup(w http.ResponseWriter, r *http.Request) error {
@@ -286,10 +314,14 @@ func (s *Server) restoreBackup(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if err := s.Backups.RestoreApp(app, b); err != nil {
+	var parts store.BackupParts
+	if err := decode(r, &parts); err != nil {
+		return err
+	}
+	if err := s.Backups.RestoreApp(app, b, parts); err != nil {
 		return errorf(http.StatusConflict, "%v", err)
 	}
-	s.auditApp(r, "backup.restore", app, filepath.Base(b.File))
+	s.auditApp(r, "backup.restore", app, fmt.Sprintf("%s from %s", partsLabel(parts), filepath.Base(b.File)))
 	return noContent(w)
 }
 

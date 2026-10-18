@@ -20,31 +20,33 @@ const (
 )
 
 type App struct {
-	ID                   string `json:"id"`
-	ProjectID            string `json:"project_id"`
-	Name                 string `json:"name"`
-	Runtime              string `json:"runtime"`
-	Port                 int    `json:"port"`
-	Source               string `json:"source"`
-	GitURL               string `json:"git_url"`
-	GitBranch            string `json:"git_branch"`
-	GitSubdir            string `json:"git_subdir"`
-	GitCredentialID      string `json:"git_credential_id"`
-	GitHubInstallationID int64  `json:"github_installation_id"`
-	Autodeploy           bool   `json:"autodeploy"`
-	PushedCommit         string `json:"pushed_commit"`
-	PushedMessage        string `json:"pushed_message"`
-	WebhookSecret        string `json:"-"`
-	RunAsUser            string `json:"run_as_user"`
-	RunAsPassword        string `json:"-"`
-	KeepBundles          int    `json:"keep_bundles"`
-	LogRetentionDays     int    `json:"log_retention_days"`
-	BackupCron           string `json:"backup_cron"`
-	BackupKeep           int    `json:"backup_keep"`
-	RecordRequests       bool   `json:"record_requests"`
-	CurrentReleaseID     string `json:"current_release_id"`
-	DesiredState         string `json:"desired_state"`
-	CreatedAt            Time   `json:"created_at"`
+	ID                   string      `json:"id"`
+	ProjectID            string      `json:"project_id"`
+	Name                 string      `json:"name"`
+	Runtime              string      `json:"runtime"`
+	Port                 int         `json:"port"`
+	Source               string      `json:"source"`
+	GitURL               string      `json:"git_url"`
+	GitBranch            string      `json:"git_branch"`
+	GitSubdir            string      `json:"git_subdir"`
+	GitCredentialID      string      `json:"git_credential_id"`
+	GitHubInstallationID int64       `json:"github_installation_id"`
+	Autodeploy           bool        `json:"autodeploy"`
+	PushedCommit         string      `json:"pushed_commit"`
+	PushedMessage        string      `json:"pushed_message"`
+	WebhookSecret        string      `json:"-"`
+	RunAsUser            string      `json:"run_as_user"`
+	RunAsPassword        string      `json:"-"`
+	KeepBundles          int         `json:"keep_bundles"`
+	LogRetentionDays     int         `json:"log_retention_days"`
+	BackupEnabled        bool        `json:"backup_enabled"`
+	BackupCron           string      `json:"backup_cron"`
+	BackupKeep           int         `json:"backup_keep"`
+	BackupParts          BackupParts `json:"backup_parts"`
+	RecordRequests       bool        `json:"record_requests"`
+	CurrentReleaseID     string      `json:"current_release_id"`
+	DesiredState         string      `json:"desired_state"`
+	CreatedAt            Time        `json:"created_at"`
 
 	// Config holds what was changed in the UI on top of moonshed.yaml.
 	Config manifest.Overrides `json:"config"`
@@ -53,20 +55,23 @@ type App struct {
 const appColumns = `id, COALESCE(project_id, ''), name, runtime, port, source, git_url, git_branch, git_subdir,
 	COALESCE(git_credential_id, ''), COALESCE(github_installation_id, 0), autodeploy, pushed_commit, pushed_message,
 	webhook_secret, run_as_user, run_as_password, keep_bundles, log_retention_days,
-	backup_cron, backup_keep, record_requests, current_release_id, desired_state, created_at, config`
+	backup_enabled, backup_cron, backup_keep, backup_parts, record_requests, current_release_id, desired_state, created_at, config`
 
 func (s *Store) scanApp(row interface{ Scan(...any) error }) (*App, error) {
 	var a App
-	var config string
+	var config, parts string
 	err := row.Scan(&a.ID, &a.ProjectID, &a.Name, &a.Runtime, &a.Port, &a.Source, &a.GitURL, &a.GitBranch, &a.GitSubdir,
 		&a.GitCredentialID, &a.GitHubInstallationID, &a.Autodeploy, &a.PushedCommit, &a.PushedMessage,
 		&a.WebhookSecret, &a.RunAsUser, &a.RunAsPassword, &a.KeepBundles, &a.LogRetentionDays,
-		&a.BackupCron, &a.BackupKeep, &a.RecordRequests, &a.CurrentReleaseID, &a.DesiredState, &a.CreatedAt, &config)
+		&a.BackupEnabled, &a.BackupCron, &a.BackupKeep, &parts, &a.RecordRequests, &a.CurrentReleaseID, &a.DesiredState, &a.CreatedAt, &config)
 	if err != nil {
 		return nil, notFound(err)
 	}
 	if err := json.Unmarshal([]byte(config), &a.Config); err != nil {
 		return nil, fmt.Errorf("config of %s: %w", a.Name, err)
+	}
+	if err := json.Unmarshal([]byte(parts), &a.BackupParts); err != nil {
+		return nil, fmt.Errorf("backup parts of %s: %w", a.Name, err)
 	}
 	if a.RunAsPassword, err = s.box.Decrypt(a.RunAsPassword); err != nil {
 		return nil, fmt.Errorf("decrypt run-as password for %s: %w", a.Name, err)
@@ -123,14 +128,18 @@ func (s *Store) CreateApp(a *App) error {
 	if err != nil {
 		return err
 	}
+	parts, err := json.Marshal(a.BackupParts)
+	if err != nil {
+		return err
+	}
 	a.ID, a.CreatedAt = NewID(), Now()
 	_, err = s.db.Exec(`INSERT INTO apps (id, project_id, name, runtime, port, source, git_url, git_branch, git_subdir,
 		git_credential_id, github_installation_id, autodeploy, webhook_secret, run_as_user, run_as_password,
-		keep_bundles, log_retention_days, backup_cron, backup_keep, desired_state, created_at, config)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		keep_bundles, log_retention_days, backup_enabled, backup_cron, backup_keep, backup_parts, desired_state, created_at, config)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		a.ID, nullID(a.ProjectID), a.Name, a.Runtime, a.Port, a.Source, a.GitURL, a.GitBranch, a.GitSubdir,
 		nullID(a.GitCredentialID), nullInt(a.GitHubInstallationID), boolInt(a.Autodeploy), a.WebhookSecret, a.RunAsUser, runAsPassword,
-		a.KeepBundles, a.LogRetentionDays, a.BackupCron, a.BackupKeep, a.DesiredState, a.CreatedAt, string(config))
+		a.KeepBundles, a.LogRetentionDays, boolInt(a.BackupEnabled), a.BackupCron, a.BackupKeep, string(parts), a.DesiredState, a.CreatedAt, string(config))
 	return err
 }
 
@@ -143,13 +152,17 @@ func (s *Store) UpdateApp(a *App) error {
 	if err != nil {
 		return err
 	}
+	parts, err := json.Marshal(a.BackupParts)
+	if err != nil {
+		return err
+	}
 	_, err = s.db.Exec(`UPDATE apps SET project_id = ?, runtime = ?, port = ?, source = ?, git_url = ?, git_branch = ?, git_subdir = ?,
 		git_credential_id = ?, github_installation_id = ?, autodeploy = ?, run_as_user = ?, run_as_password = ?,
-		keep_bundles = ?, log_retention_days = ?, backup_cron = ?, backup_keep = ?, config = ?
+		keep_bundles = ?, log_retention_days = ?, backup_enabled = ?, backup_cron = ?, backup_keep = ?, backup_parts = ?, config = ?
 		WHERE id = ?`,
 		nullID(a.ProjectID), a.Runtime, a.Port, a.Source, a.GitURL, a.GitBranch, a.GitSubdir,
 		nullID(a.GitCredentialID), nullInt(a.GitHubInstallationID), boolInt(a.Autodeploy), a.RunAsUser, runAsPassword,
-		a.KeepBundles, a.LogRetentionDays, a.BackupCron, a.BackupKeep, string(config), a.ID)
+		a.KeepBundles, a.LogRetentionDays, boolInt(a.BackupEnabled), a.BackupCron, a.BackupKeep, string(parts), string(config), a.ID)
 	return err
 }
 

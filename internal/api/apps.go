@@ -16,6 +16,7 @@ import (
 	"github.com/SiddheshNan/moonshed/internal/engine"
 	"github.com/SiddheshNan/moonshed/internal/manifest"
 	"github.com/SiddheshNan/moonshed/internal/metrics"
+	"github.com/SiddheshNan/moonshed/internal/proc"
 	"github.com/SiddheshNan/moonshed/internal/store"
 )
 
@@ -108,23 +109,25 @@ func (s *Server) getApp(w http.ResponseWriter, r *http.Request) error {
 }
 
 type appInput struct {
-	Name                 string  `json:"name"`
-	ProjectID            string  `json:"project_id"`
-	Runtime              string  `json:"runtime"`
-	Port                 int     `json:"port"`
-	Source               string  `json:"source"`
-	GitURL               string  `json:"git_url"`
-	GitBranch            string  `json:"git_branch"`
-	GitSubdir            string  `json:"git_subdir"`
-	GitCredentialID      string  `json:"git_credential_id"`
-	GitHubInstallationID int64   `json:"github_installation_id"`
-	Autodeploy           *bool   `json:"autodeploy"`
-	RunAsUser            string  `json:"run_as_user"`
-	RunAsPassword        *string `json:"run_as_password"`
-	KeepBundles          int     `json:"keep_bundles"`
-	LogRetentionDays     int     `json:"log_retention_days"`
-	BackupCron           string  `json:"backup_cron"`
-	BackupKeep           int     `json:"backup_keep"`
+	Name                 string             `json:"name"`
+	ProjectID            string             `json:"project_id"`
+	Runtime              string             `json:"runtime"`
+	Port                 int                `json:"port"`
+	Source               string             `json:"source"`
+	GitURL               string             `json:"git_url"`
+	GitBranch            string             `json:"git_branch"`
+	GitSubdir            string             `json:"git_subdir"`
+	GitCredentialID      string             `json:"git_credential_id"`
+	GitHubInstallationID int64              `json:"github_installation_id"`
+	Autodeploy           *bool              `json:"autodeploy"`
+	RunAsUser            string             `json:"run_as_user"`
+	RunAsPassword        *string            `json:"run_as_password"`
+	KeepBundles          int                `json:"keep_bundles"`
+	LogRetentionDays     int                `json:"log_retention_days"`
+	BackupEnabled        bool               `json:"backup_enabled"`
+	BackupCron           string             `json:"backup_cron"`
+	BackupKeep           int                `json:"backup_keep"`
+	BackupParts          *store.BackupParts `json:"backup_parts"`
 
 	// Config replaces the app's UI overrides of moonshed.yaml as a whole; it's left nil by
 	// inputFrom so a request without it keeps them.
@@ -149,8 +152,10 @@ func inputFrom(app *store.App) appInput {
 		RunAsUser:            app.RunAsUser,
 		KeepBundles:          app.KeepBundles,
 		LogRetentionDays:     app.LogRetentionDays,
+		BackupEnabled:        app.BackupEnabled,
 		BackupCron:           app.BackupCron,
 		BackupKeep:           app.BackupKeep,
+		BackupParts:          &app.BackupParts,
 	}
 }
 
@@ -175,6 +180,10 @@ func (in *appInput) apply(app *store.App) {
 	app.LogRetentionDays = cmp.Or(in.LogRetentionDays, 14)
 	app.BackupCron = strings.TrimSpace(in.BackupCron)
 	app.BackupKeep = cmp.Or(in.BackupKeep, 7)
+	app.BackupEnabled = in.BackupEnabled
+	if in.BackupParts != nil {
+		app.BackupParts = *in.BackupParts
+	}
 	if in.Config != nil {
 		app.Config = *in.Config
 	}
@@ -223,6 +232,17 @@ func (s *Server) validateApp(app *store.App) error {
 	if app.KeepBundles < 1 || app.LogRetentionDays < 1 || app.BackupKeep < 1 {
 		return badRequest("retention values must be at least 1")
 	}
+	if app.RunAsUser != "" {
+		if err := proc.CanRunAs(app.RunAsUser); err != nil {
+			return badRequest("run as user: %v", err)
+		}
+	}
+	if app.BackupEnabled && app.BackupCron == "" {
+		return badRequest("scheduled backups need a cron expression")
+	}
+	if app.BackupEnabled && !app.BackupParts.Any() {
+		return badRequest("pick at least one thing to back up")
+	}
 	if err := backup.ValidateCron(app.BackupCron); err != nil {
 		return badRequest("invalid backup schedule: %v", err)
 	}
@@ -263,6 +283,7 @@ func (s *Server) createApp(w http.ResponseWriter, r *http.Request) error {
 		Runtime:       in.Runtime,
 		WebhookSecret: randomToken(),
 		DesiredState:  store.StateStopped,
+		BackupParts:   store.BackupParts{Code: true, Data: true, Env: true},
 	}
 	in.apply(app)
 	if err := s.validateApp(app); err != nil {
@@ -362,7 +383,7 @@ func changedFields(a, b *store.App) string {
 	check("run as user", a.RunAsUser != b.RunAsUser || a.RunAsPassword != b.RunAsPassword)
 	check("retention", a.KeepBundles != b.KeepBundles || a.LogRetentionDays != b.LogRetentionDays)
 	check("build and health settings", !reflect.DeepEqual(a.Config, b.Config))
-	check("backups", a.BackupCron != b.BackupCron || a.BackupKeep != b.BackupKeep)
+	check("backups", a.BackupEnabled != b.BackupEnabled || a.BackupCron != b.BackupCron || a.BackupKeep != b.BackupKeep || a.BackupParts != b.BackupParts)
 	if len(changed) == 0 {
 		return "no changes"
 	}

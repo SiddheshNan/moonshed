@@ -304,3 +304,6 @@ func (u *User) Grant(paths ...string) error {
 	}
 	return nil
 }
+
+// CanRunAs is checked when the app starts on Windows, where LogonUser needs the password.
+func CanRunAs(string) error { return nil }

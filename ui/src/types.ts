@@ -93,8 +93,10 @@ export interface App {
   run_as_user: string;
   keep_bundles: number;
   log_retention_days: number;
+  backup_enabled: boolean;
   backup_cron: string;
   backup_keep: number;
+  backup_parts: BackupParts;
   current_release_id: string;
   desired_state: 'running' | 'stopped';
   created_at: string;
@@ -191,7 +193,16 @@ export interface Backup {
   size: number;
   status: 'running' | 'success' | 'failed';
   error: string;
+  parts: BackupParts;
   created_at: string;
+}
+
+// What an app backup includes. Platform backups always hold the database and its key.
+export interface BackupParts {
+  code: boolean;
+  data: boolean;
+  env: boolean;
+  logs: boolean;
 }
 
 export interface Incident {
@@ -276,6 +287,7 @@ export interface Settings {
   trusted_proxies: string[];
   global_options: string;
   extra_sites: string;
+  backup_enabled: boolean;
   backup_cron: string;
   backup_keep: number;
 }

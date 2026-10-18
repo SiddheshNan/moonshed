@@ -101,6 +101,19 @@ func safeJoin(dest, name string) (string, error) {
 
 // Zip writes the contents of dir to w, skipping top-level entries named in exclude.
 func Zip(w io.Writer, dir string, exclude ...string) error {
+	return ZipFunc(w, dir, func(rel string) bool {
+		for _, ex := range exclude {
+			if rel == ex {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+// ZipFunc writes the contents of dir to w, skipping entries (slash-separated paths
+// relative to dir) for which skip returns true.
+func ZipFunc(w io.Writer, dir string, skip func(rel string) bool) error {
 	zw := zip.NewWriter(w)
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -111,13 +124,11 @@ func Zip(w io.Writer, dir string, exclude ...string) error {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		for _, ex := range exclude {
-			if rel == ex {
-				if d.IsDir() {
-					return filepath.SkipDir
-				}
-				return nil
+		if skip(rel) {
+			if d.IsDir() {
+				return filepath.SkipDir
 			}
+			return nil
 		}
 		if !d.Type().IsRegular() && !d.IsDir() {
 			return nil
@@ -338,4 +349,74 @@ func DirSize(dir string) int64 {
 		return nil
 	})
 	return total
+}
+
+// TarGzWriter builds a .tar.gz from files on disk and generated content.
+type TarGzWriter struct {
+	gz *gzip.Writer
+	tw *tar.Writer
+}
+
+func NewTarGzWriter(w io.Writer) *TarGzWriter {
+	gz := gzip.NewWriter(w)
+	return &TarGzWriter{gz: gz, tw: tar.NewWriter(gz)}
+}
+
+// AddPath adds the file or folder at src under name, skipping anything under it that skip
+// (given slash-separated paths relative to src) rejects. Symlinks are left out.
+func (t *TarGzWriter) AddPath(src, name string, skip func(rel string) bool) error {
+	return filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		if rel != "." && skip != nil && skip(rel) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !d.Type().IsRegular() && !d.IsDir() {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		hdr, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return err
+		}
+		hdr.Name = path.Join(name, rel)
+		if d.IsDir() {
+			hdr.Name += "/"
+		}
+		if err := t.tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		return copyFile(t.tw, p)
+	})
+}
+
+// AddFile adds generated content as a regular file.
+func (t *TarGzWriter) AddFile(name string, data []byte, mode int64) error {
+	if err := t.tw.WriteHeader(&tar.Header{Name: name, Mode: mode, Size: int64(len(data)), Typeflag: tar.TypeReg}); err != nil {
+		return err
+	}
+	_, err := t.tw.Write(data)
+	return err
+}
+
+func (t *TarGzWriter) Close() error {
+	if err := t.tw.Close(); err != nil {
+		return err
+	}
+	return t.gz.Close()
 }
