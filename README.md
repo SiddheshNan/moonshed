@@ -6,13 +6,13 @@
 
 > **Status: early development.** Moonshed is pre-release. Expect rough edges and breaking changes.
 
-![Moonshed dashboard](docs/screenshots/dashboard.png)
+![Moonshed dashboard](website/public/screenshots/dashboard.png)
 
 | App overview | Deployments |
 |---|---|
-| ![App overview](docs/screenshots/app-overview.png) | ![Deployments](docs/screenshots/deployments.png) |
+| ![App overview](website/public/screenshots/app-overview.png) | ![Deployments](website/public/screenshots/deployments.png) |
 | **Monitoring** | **Backups** |
-| ![Monitoring](docs/screenshots/monitoring.png) | ![Backups](docs/screenshots/backups.png) |
+| ![Monitoring](website/public/screenshots/monitoring.png) | ![Backups](website/public/screenshots/backups.png) |
 
 ## Why Moonshed
 
@@ -108,6 +108,12 @@ cd ui && npm install && npm run dev
 Open http://localhost:5050. In development the panel forwards the UI to the Vite dev server (`ui:` in `runtime/config/development.yaml`), so changes show up live. See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and conventions.
 
 ## Docs
+
+The user docs are a VitePress site in [website/](website). Run them locally with:
+
+```bash
+cd website && npm install && npm run dev
+```
 
 [DESIGN.md](docs/DESIGN.md) explains how it works: `moonshed.yaml`, runtimes, the deploy flow, the proxy, monitoring, backups and the API.
 

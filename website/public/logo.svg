@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Moonshed">
+  <defs>
+    <linearGradient id="ms-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c2347"/>
+      <stop offset="1" stop-color="#090c16"/>
+    </linearGradient>
+    <linearGradient id="ms-moon" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#ffe28f"/>
+      <stop offset="1" stop-color="#f5b02a"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#ms-sky)"/>
+  <circle cx="42" cy="22" r="12" fill="url(#ms-moon)"/>
+  <path d="M12 54V35.5L52 27v27z" fill="#2c3563"/>
+  <path d="M12 35.5L52 27" stroke="#3b4684" stroke-width="2" stroke-linecap="round"/>
+  <rect x="21" y="40" width="9" height="9" rx="2" fill="#ffd35e"/>
+</svg>

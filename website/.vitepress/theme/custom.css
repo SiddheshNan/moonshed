@@ -1,0 +1,38 @@
+.home-section {
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 48px 24px 0;
+}
+
+.home-section h2 {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.home-section .lead {
+  color: var(--vp-c-text-2);
+  max-width: 640px;
+}
+
+.screens {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.screens img {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+}
+
+.screens p {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .screens {
+    grid-template-columns: 1fr;
+  }
+}
