@@ -2,11 +2,54 @@
 
 <h1 align="center">Moonshed</h1>
 
-<p align="center">A small, self-hosted platform for deploying your apps.<br>One Go binary + SQLite. Runs on Linux and Windows.</p>
+<p align="center">A small, self-hosted platform (PaaS) for deploying your apps.<br>One Go binary and SQLite. Runs on Linux and Windows.</p>
+
+<p align="center">
+  <a href="https://moonshed.siddhesh.me">Website</a> ·
+  <a href="https://moonshed.siddhesh.me/docs/">Docs</a> ·
+  <a href="https://moonshed.siddhesh.me/docs/reference/moonshed-yaml">moonshed.yaml</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
 
 > **Status: early development.** Moonshed is pre-release. Expect rough edges and breaking changes.
 
 ![Moonshed dashboard](website/public/screenshots/dashboard.png)
+
+## Why Moonshed
+
+Platforms like Dokploy and Coolify are great, but they bring a stack with them: Postgres, Redis, Traefik and Docker before your first app is even running. Moonshed is built for the small server or a minimal setup.
+
+- **One binary, one SQLite file.** The reverse proxy (Caddy) is built in. Nothing else to install or keep running.
+- **Light.** Comfortable on 1 core and 1 GB of RAM. The platform itself used about 15 MB of memory running three apps.
+- **Docker is optional.** Run an app as a plain process that Moonshed supervises (like how pm2 does), or as a container. You choose per app.
+- **Linux and Windows.** Runs as a systemd unit or a Windows service, and native apps run on either.
+- **Config in the repo or the UI.** A `moonshed.yaml` next to your code, the same settings in the panel, or just a Dockerfile.
+
+
+## Features
+
+**Deploy**
+- From GitHub through a GitHub App (private repos without personal tokens), any git URL, a zip upload, or CI with an API token.
+- Deploy on every push, or see "new commit waiting" and deploy when you're ready.
+- Docker builds with BuildKit: custom Dockerfile path, build folder, stage and build arguments.
+- A new version has to pass its health check before it replaces the old one; if it fails, the old version is started again.
+- Redeploy any of the last few versions with one click.
+
+**Run**
+- Built-in reverse proxy (Caddy) with domains, path routing and automatic HTTPS (Let's Encrypt), or your own certificate.
+- Per-domain options: HTTPS redirect, HSTS, compression, basic auth, IP allow lists, headers, body size limits, and raw Caddyfile for the rest.
+- Encrypted env vars, persistent data folders that survive deploys, and per-app OS users for native apps.
+- Live logs for every app and every deployment.
+
+**Watch**
+- CPU, memory, disk and network graphs for the server and each app, plus traffic per domain.
+- Uptime and incidents from health checks, with optional auto-restart.
+- A request log you can turn on per app.
+
+**Keep safe**
+- App backups of code, data, env vars and logs, on a schedule or on demand. They unpack to a plain copy of the app and restore part by part.
+- Platform backups of Moonshed's own database.
+- Projects, users, API tokens and an audit log of every change.
 
 | App overview | Deployments |
 |---|---|
@@ -14,65 +57,27 @@
 | **Monitoring** | **Backups** |
 | ![Monitoring](website/public/screenshots/monitoring.png) | ![Backups](website/public/screenshots/backups.png) |
 
-## Why Moonshed
+## Quick start
 
-Moonshed is a lightweight alternative to platforms like Dokploy, built to run comfortably on 1 core / 1 GB RAM:
-
-- **One binary, one SQLite file.** No Postgres, Redis or Traefik. Docker is optional.
-- **Linux and Windows.** Runs as a systemd unit or a Windows service.
-- **Native or Docker, per app.** Run an app as a plain supervised process, or as a container.
-
-## Features
-
-- **Deploy** from GitHub (through a GitHub App), any git URL, a zip upload, or CI with an API token. Pushes can deploy automatically, and each deployment links to its commit.
-- **Configure in the repo or the UI.** `moonshed.yaml` describes how to build, run and check the app; the same settings can be changed in the UI, which wins over the file.
-- **Docker builds** with BuildKit: custom Dockerfile path, build folder, stage and build arguments.
-- **Safe rollouts.** A new version must pass its health check before it replaces the old one, and earlier versions can be redeployed.
-- **Live logs** for every app and every deployment.
-- **Built-in reverse proxy** (Caddy) with domains and automatic HTTPS (Let's Encrypt), or your own certificate.
-- **Monitoring.** CPU, memory, disk and network graphs, uptime and incidents from real health checks, optional auto-restart, and a request log.
-- **Backups** of an app's code, data, env vars and logs, as an archive that unpacks to a plain copy of the app. On a schedule or on demand, restorable part by part. Moonshed backs up its own database too.
-- **Teams.** Projects, users, API tokens and an audit log.
-
-## Install
-
-Needs Go 1.26+, Node 20+ and Python 3 to build.
+There are no prebuilt releases yet. Build a bundle with Go 1.26+, Node 20+ and Python 3:
 
 ```bash
+git clone https://github.com/SiddheshNan/moonshed.git
+cd moonshed
 ./scripts/build.py
 ```
 
-It asks for the version, the target platforms, the output folder and whether to run the tests (Enter accepts the defaults), then writes a bundle per target:
-
-```
-dist/linux-amd64/
-  moonshed
-  runtime/
-    config/production.yaml
-    web/                      the UI
-```
-
-Copy a bundle to your server, check `runtime/config/production.yaml`, then as root / Administrator:
+Copy `dist/<os>-<arch>/` to your server, check `runtime/config/production.yaml`, then as root or Administrator:
 
 ```bash
 ./moonshed install -e production
 ```
 
-This registers a systemd unit (Linux) or a Windows service and starts it on boot. Open `http://<server>:5050` and create the admin account. The rest of `runtime/` (database, apps, logs, backups) is created on first run.
-
-Other commands:
-
-```bash
-./moonshed serve -e production     # run in the foreground
-./moonshed uninstall
-./moonshed reset-password admin
-```
-
-`-e` (or `ENV`) picks `runtime/config/<env>.yaml` and is required; Moonshed exits if the file is missing or incomplete. `--runtime` (or `RUNTIME_DIR`) defaults to `runtime/` next to the binary.
+Open `http://<server>:5050` and create the admin account. See the [installation guide](https://moonshed.siddhesh.me/docs/installation) for Windows, putting the panel behind HTTPS, and upgrading.
 
 ## Deploy an app
 
-Deploy from a git repository or a zip. Describe how to run it in a `moonshed.yaml` at the root, or set the same things in the app's Build settings; a `Dockerfile` alone also works:
+Describe the app in a `moonshed.yaml` at its root, or set the same things in the app's Build settings:
 
 ```yaml
 pre: |
@@ -84,19 +89,39 @@ persist:                 # kept across deploys
   - data/
 health:
   http: /healthz
-  interval: 30s
-  failures: 3
 restart_unhealthy: true
 ```
 
-Settings made in the UI override the file. Zips can be uploaded in the UI, or from CI with an API token:
+Then create the app in the panel, point it at a repository or upload a zip, and press Deploy. From CI, upload a zip with an API token:
 
 ```bash
 curl -fsS -H "Authorization: Bearer $MOONSHED_TOKEN" -H "Content-Type: application/zip" \
   --data-binary @app.zip https://panel.example.com/api/apps/$APP_ID/deploy
 ```
 
-Scripts can be one-liners, multi-line blocks, a path to a `.sh`/`.ps1`/`.cmd` file, or per-OS (`linux:` / `windows:`). Docker apps can add a `build:` block (`dockerfile`, `folder`, `stage`, `args`). [DESIGN.md](docs/DESIGN.md) lists every key, and [examples/python-app](examples/python-app) is a working example.
+[examples/python-app](examples/python-app) is a working example, and the [moonshed.yaml reference](https://moonshed.siddhesh.me/docs/reference/moonshed-yaml) lists every key.
+
+## Good to know
+
+Moonshed keeps things simple on purpose. Today it:
+
+- runs on **one server**; there is no multi-server mode yet,
+- has a **short gap during a deploy** while the old version stops and the new one starts,
+- has **no resource limits** per app yet,
+- doesn't sandbox native apps; give an app its own OS user to limit what it can touch.
+
+These are on the list for later versions.
+
+## Documentation
+
+- [Docs](https://moonshed.siddhesh.me/docs/): guides for installing, deploying, domains, monitoring and backups. The source is in [website/](website).
+- [DESIGN.md](docs/DESIGN.md): how Moonshed works inside, for contributors.
+
+Run the docs site locally:
+
+```bash
+cd website && npm install && npm run dev
+```
 
 ## Development
 
@@ -105,17 +130,7 @@ go run ./cmd/moonshed serve -e development
 cd ui && npm install && npm run dev
 ```
 
-Open http://localhost:5050. In development the panel forwards the UI to the Vite dev server (`ui:` in `runtime/config/development.yaml`), so changes show up live. See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and conventions.
-
-## Docs
-
-The user docs are a VitePress site in [website/](website). Run them locally with:
-
-```bash
-cd website && npm install && npm run dev
-```
-
-[DESIGN.md](docs/DESIGN.md) explains how it works: `moonshed.yaml`, runtimes, the deploy flow, the proxy, monitoring, backups and the API.
+Open http://localhost:5050. In development the panel forwards the UI to the Vite dev server, so changes show up live. See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and conventions.
 
 ## Contributing
 

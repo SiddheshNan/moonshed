@@ -29,7 +29,8 @@ internal/
 ui/                 React + Mantine panel
 runtime/config/     development.yaml and production.yaml
 scripts/build.py    release build
-docs/               design doc and screenshots
+docs/               design doc
+website/            website and user docs (VitePress)
 examples/           sample apps
 ```
 
@@ -49,7 +50,6 @@ cd ui && npm run typecheck
 - Platform code is split by file suffix (`_unix.go`, `_windows.go`). Keep both compiling.
 - Dependencies must be pure Go (builds use `CGO_ENABLED=0`) and light. Moonshed targets 1 core and 1 GB of RAM.
 - Schema changes are a new step appended to `internal/store/schema.go`, never an edit to an existing one.
-- The UI shows only real data. If something hasn't been measured, show "No data", not a default.
 - When the API's JSON changes, update `ui/src/types.ts` in the same change.
 
 ## Releases

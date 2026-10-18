@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: Moonshed
-  text: Deploy your apps on your own server
+  text: A small, self-hosted platform (PaaS) for deploying your apps.
   tagline: One Go binary and SQLite. Runs on Linux and Windows, comfortably on 1 core and 1 GB of RAM.
   image:
     src: /logo.svg
