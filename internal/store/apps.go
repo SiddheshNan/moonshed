@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+
+	"github.com/SiddheshNan/moonshed/internal/manifest"
 )
 
 const (
@@ -37,28 +39,34 @@ type App struct {
 	RunAsPassword        string `json:"-"`
 	KeepBundles          int    `json:"keep_bundles"`
 	LogRetentionDays     int    `json:"log_retention_days"`
-	AutoRestart          bool   `json:"auto_restart"`
 	BackupCron           string `json:"backup_cron"`
 	BackupKeep           int    `json:"backup_keep"`
 	RecordRequests       bool   `json:"record_requests"`
 	CurrentReleaseID     string `json:"current_release_id"`
 	DesiredState         string `json:"desired_state"`
 	CreatedAt            Time   `json:"created_at"`
+
+	// Config holds what was changed in the UI on top of moonshed.yaml.
+	Config manifest.Overrides `json:"config"`
 }
 
 const appColumns = `id, COALESCE(project_id, ''), name, runtime, port, source, git_url, git_branch, git_subdir,
 	COALESCE(git_credential_id, ''), COALESCE(github_installation_id, 0), autodeploy, pushed_commit, pushed_message,
-	webhook_secret, run_as_user, run_as_password, keep_bundles, log_retention_days, auto_restart,
-	backup_cron, backup_keep, record_requests, current_release_id, desired_state, created_at`
+	webhook_secret, run_as_user, run_as_password, keep_bundles, log_retention_days,
+	backup_cron, backup_keep, record_requests, current_release_id, desired_state, created_at, config`
 
 func (s *Store) scanApp(row interface{ Scan(...any) error }) (*App, error) {
 	var a App
+	var config string
 	err := row.Scan(&a.ID, &a.ProjectID, &a.Name, &a.Runtime, &a.Port, &a.Source, &a.GitURL, &a.GitBranch, &a.GitSubdir,
 		&a.GitCredentialID, &a.GitHubInstallationID, &a.Autodeploy, &a.PushedCommit, &a.PushedMessage,
 		&a.WebhookSecret, &a.RunAsUser, &a.RunAsPassword, &a.KeepBundles, &a.LogRetentionDays,
-		&a.AutoRestart, &a.BackupCron, &a.BackupKeep, &a.RecordRequests, &a.CurrentReleaseID, &a.DesiredState, &a.CreatedAt)
+		&a.BackupCron, &a.BackupKeep, &a.RecordRequests, &a.CurrentReleaseID, &a.DesiredState, &a.CreatedAt, &config)
 	if err != nil {
 		return nil, notFound(err)
+	}
+	if err := json.Unmarshal([]byte(config), &a.Config); err != nil {
+		return nil, fmt.Errorf("config of %s: %w", a.Name, err)
 	}
 	if a.RunAsPassword, err = s.box.Decrypt(a.RunAsPassword); err != nil {
 		return nil, fmt.Errorf("decrypt run-as password for %s: %w", a.Name, err)
@@ -111,14 +119,18 @@ func (s *Store) CreateApp(a *App) error {
 	if err != nil {
 		return err
 	}
+	config, err := json.Marshal(a.Config)
+	if err != nil {
+		return err
+	}
 	a.ID, a.CreatedAt = NewID(), Now()
 	_, err = s.db.Exec(`INSERT INTO apps (id, project_id, name, runtime, port, source, git_url, git_branch, git_subdir,
 		git_credential_id, github_installation_id, autodeploy, webhook_secret, run_as_user, run_as_password,
-		keep_bundles, log_retention_days, auto_restart, backup_cron, backup_keep, desired_state, created_at)
+		keep_bundles, log_retention_days, backup_cron, backup_keep, desired_state, created_at, config)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		a.ID, nullID(a.ProjectID), a.Name, a.Runtime, a.Port, a.Source, a.GitURL, a.GitBranch, a.GitSubdir,
 		nullID(a.GitCredentialID), nullInt(a.GitHubInstallationID), boolInt(a.Autodeploy), a.WebhookSecret, a.RunAsUser, runAsPassword,
-		a.KeepBundles, a.LogRetentionDays, boolInt(a.AutoRestart), a.BackupCron, a.BackupKeep, a.DesiredState, a.CreatedAt)
+		a.KeepBundles, a.LogRetentionDays, a.BackupCron, a.BackupKeep, a.DesiredState, a.CreatedAt, string(config))
 	return err
 }
 
@@ -127,13 +139,17 @@ func (s *Store) UpdateApp(a *App) error {
 	if err != nil {
 		return err
 	}
+	config, err := json.Marshal(a.Config)
+	if err != nil {
+		return err
+	}
 	_, err = s.db.Exec(`UPDATE apps SET project_id = ?, runtime = ?, port = ?, source = ?, git_url = ?, git_branch = ?, git_subdir = ?,
 		git_credential_id = ?, github_installation_id = ?, autodeploy = ?, run_as_user = ?, run_as_password = ?,
-		keep_bundles = ?, log_retention_days = ?, auto_restart = ?, backup_cron = ?, backup_keep = ?
+		keep_bundles = ?, log_retention_days = ?, backup_cron = ?, backup_keep = ?, config = ?
 		WHERE id = ?`,
 		nullID(a.ProjectID), a.Runtime, a.Port, a.Source, a.GitURL, a.GitBranch, a.GitSubdir,
 		nullID(a.GitCredentialID), nullInt(a.GitHubInstallationID), boolInt(a.Autodeploy), a.RunAsUser, runAsPassword,
-		a.KeepBundles, a.LogRetentionDays, boolInt(a.AutoRestart), a.BackupCron, a.BackupKeep, a.ID)
+		a.KeepBundles, a.LogRetentionDays, a.BackupCron, a.BackupKeep, string(config), a.ID)
 	return err
 }
 

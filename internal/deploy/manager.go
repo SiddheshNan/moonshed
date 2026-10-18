@@ -300,6 +300,34 @@ func (m *Manager) Stop(app *store.App) error {
 	return m.engineFor(app).Stop(app.Name)
 }
 
+// SwitchRuntime moves a deployed app between native and Docker. The running release can't
+// be run by the other engine, so the app is stopped and the release dropped; the next
+// deploy builds it for the new runtime.
+func (m *Manager) SwitchRuntime(app *store.App, runtime string) error {
+	l := m.appLock(app.ID)
+	if !l.TryLock() {
+		return ErrBusy
+	}
+	defer l.Unlock()
+	if app.CurrentReleaseID != "" {
+		if err := m.engineFor(app).Stop(app.Name); err != nil {
+			return err
+		}
+		if rel, err := m.store.Release(app.CurrentReleaseID); err == nil {
+			m.removeRelease(app, rel)
+		}
+		if err := m.store.SetCurrentRelease(app.ID, ""); err != nil {
+			return err
+		}
+		if err := m.store.SetDesiredState(app.ID, store.StateStopped); err != nil {
+			return err
+		}
+		m.AppLog(app.Name).Printf("runtime changed to %s; deploy to start it again", runtime)
+	}
+	app.Runtime, app.CurrentReleaseID, app.DesiredState = runtime, "", store.StateStopped
+	return m.store.SetRuntime(app.ID, runtime)
+}
+
 func (m *Manager) Restart(app *store.App) error {
 	l := m.appLock(app.ID)
 	if !l.TryLock() {

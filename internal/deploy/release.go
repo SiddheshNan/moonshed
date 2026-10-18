@@ -28,6 +28,7 @@ func (m *Manager) startRelease(app *store.App, releaseID string) error {
 		return err
 	}
 	ap := m.paths.App(app.Name)
+	mf := manifest.Effective(rel.Manifest, app.Config)
 	spec := engine.Spec{
 		App:     app.Name,
 		Release: rel.ID,
@@ -38,18 +39,18 @@ func (m *Manager) startRelease(app *store.App, releaseID string) error {
 	}
 	if app.Runtime == store.RuntimeDocker {
 		spec.Image = rel.Image
-		if rel.Manifest != nil && len(rel.Manifest.Persist) > 0 {
+		if len(mf.Persist) > 0 {
 			wd, err := m.docker.WorkDir(rel.Image)
 			if err != nil {
 				return err
 			}
-			spec.Mounts = engine.MountsFor(existing(ap.Shared(), rel.Manifest.Persist), ap.Shared(), wd)
+			spec.Mounts = engine.MountsFor(existing(ap.Shared(), mf.Persist), ap.Shared(), wd)
 		}
 	} else {
-		if rel.Manifest == nil || rel.Manifest.Run.Current() == "" {
-			return errors.New("this release has no run script for this OS")
+		if err := mf.ValidateNative(); err != nil {
+			return err
 		}
-		spec.Run = rel.Manifest.Run.Current()
+		spec.Run = mf.Run.Current()
 		spec.RunAs, spec.RunAsPassword = app.RunAsUser, app.RunAsPassword
 	}
 	spec.Log.Printf("starting the app")
@@ -79,9 +80,6 @@ func (m *Manager) env(app *store.App, releaseID string) ([]string, error) {
 // preparePersist seeds shared/ from the bundle on first deploy and, for native apps,
 // links each persisted path from the release into shared/.
 func (m *Manager) preparePersist(app *store.App, dir string, mf *manifest.Manifest, log *logs.Stream) error {
-	if mf == nil {
-		return nil
-	}
 	shared := m.paths.App(app.Name).Shared()
 	for _, p := range mf.Persist {
 		isDir := strings.HasSuffix(p, "/")

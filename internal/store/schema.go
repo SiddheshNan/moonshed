@@ -189,8 +189,14 @@ CREATE TABLE audit_log (
 );
 CREATE INDEX audit_log_ts ON audit_log(ts);
 `,
-// Proxy options and raw Caddyfile per domain. Existing domains keep redirecting to HTTPS.
-`
+	// Proxy options and raw Caddyfile per domain. Existing domains keep redirecting to HTTPS.
+	`
 ALTER TABLE domains ADD COLUMN options  TEXT NOT NULL DEFAULT '{"force_https":true}';
 ALTER TABLE domains ADD COLUMN advanced TEXT NOT NULL DEFAULT '';
+`,
+	// Settings made in the UI on top of moonshed.yaml. Auto-restart moved into them.
+	`
+ALTER TABLE apps ADD COLUMN config TEXT NOT NULL DEFAULT '{}';
+UPDATE apps SET config = '{"restart_unhealthy":true}' WHERE auto_restart = 1;
+ALTER TABLE apps DROP COLUMN auto_restart;
 `}

@@ -19,11 +19,11 @@ var client = &http.Client{
 }
 
 // Probe runs one health check against the app's local port and returns its latency.
-func Probe(ctx context.Context, port int, h *manifest.Health) (time.Duration, error) {
+func Probe(ctx context.Context, port int, h manifest.Health) (time.Duration, error) {
 	if port <= 0 {
 		return 0, errors.New("health check needs the app to have a port")
 	}
-	ctx, cancel := context.WithTimeout(ctx, h.Timeout)
+	ctx, cancel := context.WithTimeout(ctx, h.Timeout.D())
 	defer cancel()
 	addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
 	start := time.Now()

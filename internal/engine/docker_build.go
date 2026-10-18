@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"path/filepath"
+	"strings"
 
 	bkclient "github.com/moby/buildkit/client"
 	"github.com/moby/moby/api/types/build"
@@ -17,10 +19,18 @@ import (
 	"github.com/SiddheshNan/moonshed/internal/archive"
 )
 
-// Build builds the Dockerfile in dir and tags the image. It uses the engine's BuildKit,
-// and only falls back to the classic builder on engines without BuildKit
-// (e.g. Windows containers).
-func (d *Docker) Build(ctx context.Context, dir, tag string, log io.Writer) error {
+// BuildOptions describe one image build. Paths are absolute.
+type BuildOptions struct {
+	Folder     string // what the Dockerfile can COPY from
+	Dockerfile string
+	Stage      string // optional target stage of a multi-stage Dockerfile
+	Args       map[string]string
+	Tag        string
+}
+
+// Build builds and tags the image. It uses the engine's BuildKit, and only falls back to
+// the classic builder on engines without BuildKit (e.g. Windows containers).
+func (d *Docker) Build(ctx context.Context, opts BuildOptions, log io.Writer) error {
 	if d.cli == nil {
 		return ErrNoDocker
 	}
@@ -29,13 +39,13 @@ func (d *Docker) Build(ctx context.Context, dir, tag string, log io.Writer) erro
 		return ErrNoDocker
 	}
 	if ping.BuilderVersion == build.BuilderBuildKit {
-		return d.buildKit(ctx, dir, tag, log)
+		return d.buildKit(ctx, opts, log)
 	}
 	fmt.Fprintln(log, "engine has no BuildKit, using the classic builder")
-	return d.buildClassic(ctx, dir, tag, log)
+	return d.buildClassic(ctx, opts, log)
 }
 
-func (d *Docker) buildKit(ctx context.Context, dir, tag string, log io.Writer) error {
+func (d *Docker) buildKit(ctx context.Context, opts BuildOptions, log io.Writer) error {
 	bk, err := bkclient.New(ctx, "",
 		bkclient.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
 			return d.cli.DialHijack(ctx, "/grpc", "h2c", nil)
@@ -49,9 +59,20 @@ func (d *Docker) buildKit(ctx context.Context, dir, tag string, log io.Writer) e
 	}
 	defer bk.Close()
 
-	src, err := fsutil.NewFS(dir)
+	src, err := fsutil.NewFS(opts.Folder)
 	if err != nil {
 		return err
+	}
+	dockerfileDir, err := fsutil.NewFS(filepath.Dir(opts.Dockerfile))
+	if err != nil {
+		return err
+	}
+	attrs := map[string]string{"filename": filepath.Base(opts.Dockerfile)}
+	if opts.Stage != "" {
+		attrs["target"] = opts.Stage
+	}
+	for k, v := range opts.Args {
+		attrs["build-arg:"+k] = v
 	}
 	status := make(chan *bkclient.SolveStatus)
 	done := make(chan struct{})
@@ -61,9 +82,9 @@ func (d *Docker) buildKit(ctx context.Context, dir, tag string, log io.Writer) e
 	}()
 	_, err = bk.Solve(ctx, nil, bkclient.SolveOpt{
 		Frontend:      "dockerfile.v0",
-		FrontendAttrs: map[string]string{"filename": "Dockerfile"},
-		LocalMounts:   map[string]fsutil.FS{"context": src, "dockerfile": src},
-		Exports:       []bkclient.ExportEntry{{Type: "moby", Attrs: map[string]string{"name": tag}}},
+		FrontendAttrs: attrs,
+		LocalMounts:   map[string]fsutil.FS{"context": src, "dockerfile": dockerfileDir},
+		Exports:       []bkclient.ExportEntry{{Type: "moby", Attrs: map[string]string{"name": opts.Tag}}},
 	}, status)
 	<-done
 	return err
@@ -99,12 +120,23 @@ func printProgress(ch <-chan *bkclient.SolveStatus, log io.Writer) {
 	}
 }
 
-func (d *Docker) buildClassic(ctx context.Context, dir, tag string, log io.Writer) error {
+// buildClassic sends the folder as the build context, so the Dockerfile has to be inside it.
+func (d *Docker) buildClassic(ctx context.Context, opts BuildOptions, log io.Writer) error {
+	dockerfile, err := filepath.Rel(opts.Folder, opts.Dockerfile)
+	if err != nil || strings.HasPrefix(dockerfile, "..") {
+		return errors.New("the classic builder needs the Dockerfile inside the build folder")
+	}
+	args := map[string]*string{}
+	for k, v := range opts.Args {
+		args[k] = &v
+	}
 	pr, pw := io.Pipe()
-	go func() { pw.CloseWithError(archive.Tar(pw, dir)) }()
+	go func() { pw.CloseWithError(archive.Tar(pw, opts.Folder)) }()
 	res, err := d.cli.ImageBuild(ctx, pr, client.ImageBuildOptions{
-		Tags:       []string{tag},
-		Dockerfile: "Dockerfile",
+		Tags:       []string{opts.Tag},
+		Dockerfile: filepath.ToSlash(dockerfile),
+		Target:     opts.Stage,
+		BuildArgs:  args,
 		Remove:     true,
 		Version:    build.BuilderV1,
 	})

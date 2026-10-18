@@ -101,36 +101,36 @@ func (m *Manager) execute(j *job) error {
 	if err := archive.Unzip(ap.Bundle(d.BundleID), dir); err != nil {
 		return err
 	}
-	mf, err := manifest.Load(dir)
+	// The release keeps moonshed.yaml as found in the bundle; what runs is that file with
+	// the app's UI settings on top.
+	file, err := manifest.Load(dir)
 	if errors.Is(err, manifest.ErrNotFound) {
-		mf, err = nil, nil
+		file, err = nil, nil
 	}
 	if err != nil {
 		return err
 	}
+	rel.Manifest = file
+	mf := manifest.Effective(file, app.Config)
 	if err := m.resolveRuntime(app, dir, mf, j.log); err != nil {
 		return err
 	}
 	if app.Runtime == store.RuntimeNative {
-		if mf == nil {
-			return manifest.ErrNotFound
-		}
 		if err := mf.ValidateNative(); err != nil {
 			return err
 		}
 	}
-	if err := m.applyManifestPort(app, mf, j.log); err != nil {
+	if err := m.applyManifestPort(app, file, j.log); err != nil {
 		return err
 	}
-	if mf != nil && mf.Health != nil && app.Port == 0 {
-		return errors.New("app.yaml has a health check but no port: set port in app.yaml or in the app settings")
+	if !mf.Check().ProcessOnly() && app.Port == 0 {
+		return errors.New("the health check needs a port: set port in moonshed.yaml or on the app's Overview")
 	}
-	rel.Manifest = mf
 
 	if err := m.preparePersist(app, dir, mf, j.log); err != nil {
 		return fmt.Errorf("persist: %w", err)
 	}
-	if err := m.build(j, app, rel); err != nil {
+	if err := m.build(j, app, rel, mf); err != nil {
 		return err
 	}
 	if err := m.store.UpdateRelease(rel); err != nil {
@@ -155,7 +155,7 @@ func (m *Manager) execute(j *job) error {
 	j.log.Printf("starting the new release")
 	err = m.startRelease(app, rel.ID)
 	if err == nil {
-		err = m.waitHealthy(j.ctx, app, mf, j.log)
+		err = m.waitHealthy(j.ctx, app, mf.Check(), j.log)
 	}
 	if err != nil {
 		eng.Stop(app.Name)
@@ -196,38 +196,42 @@ func (m *Manager) execute(j *job) error {
 }
 
 // resolveRuntime decides native or Docker on the first deploy of an app created without
-// one: app.yaml with a run script means native, otherwise a Dockerfile means Docker.
+// one: a run command means native, otherwise a Dockerfile means Docker.
 func (m *Manager) resolveRuntime(app *store.App, dir string, mf *manifest.Manifest, log *logs.Stream) error {
 	if app.Runtime != "" {
 		return nil
 	}
-	_, statErr := os.Stat(filepath.Join(dir, "Dockerfile"))
+	dockerfile := mf.Build.DockerfilePath()
+	_, statErr := os.Stat(filepath.Join(dir, filepath.FromSlash(dockerfile)))
 	hasDockerfile := statErr == nil
 	switch {
-	case mf != nil && mf.Run.Current() != "":
+	case mf.Run.Current() != "":
 		app.Runtime = store.RuntimeNative
 		if hasDockerfile {
-			log.Printf("found app.yaml with a run script and a Dockerfile; running natively (set the runtime to Docker in settings to use the Dockerfile)")
+			log.Printf("found a run command and %s; running natively (pick Docker in the app's Build settings to use the Dockerfile)", dockerfile)
 		} else {
-			log.Printf("found app.yaml, running natively")
+			log.Printf("found a run command, running natively")
 		}
 	case hasDockerfile:
+		if _, err := m.docker.Version(context.Background()); err != nil {
+			return fmt.Errorf("found %s, but Docker isn't installed or running on this server; install Docker, or set a run command to run natively", dockerfile)
+		}
 		app.Runtime = store.RuntimeDocker
-		log.Printf("found a Dockerfile, running in Docker")
+		log.Printf("found %s, running in Docker", dockerfile)
 	default:
-		return errors.New("the bundle needs an app.yaml with a run script, or a Dockerfile")
+		return fmt.Errorf("nothing to run: no run command and no %s; set one in %s or in the app's Build settings", dockerfile, manifest.FileName)
 	}
 	return m.store.SetRuntime(app.ID, app.Runtime)
 }
 
-// applyManifestPort uses app.yaml's port when the app has none set in its settings.
-// A port set in the settings always wins.
+// applyManifestPort uses moonshed.yaml's port when the app has none set in the UI.
+// A port set in the UI always wins.
 func (m *Manager) applyManifestPort(app *store.App, mf *manifest.Manifest, log *logs.Stream) error {
 	if mf == nil || mf.Port == 0 || mf.Port == app.Port {
 		return nil
 	}
 	if app.Port != 0 {
-		log.Printf("app.yaml asks for port %d, but the app settings say %d; using %d", mf.Port, app.Port, app.Port)
+		log.Printf("%s asks for port %d, but the app is set to %d; using %d", manifest.FileName, mf.Port, app.Port, app.Port)
 		return nil
 	}
 	apps, err := m.store.Apps()
@@ -236,29 +240,37 @@ func (m *Manager) applyManifestPort(app *store.App, mf *manifest.Manifest, log *
 	}
 	for _, other := range apps {
 		if other.ID != app.ID && other.Port == mf.Port {
-			return fmt.Errorf("app.yaml asks for port %d, which %s already uses", mf.Port, other.Name)
+			return fmt.Errorf("%s asks for port %d, which %s already uses", manifest.FileName, mf.Port, other.Name)
 		}
 	}
 	if err := m.store.SetAppPort(app.ID, mf.Port); err != nil {
 		return err
 	}
 	app.Port = mf.Port
-	log.Printf("using port %d from app.yaml", mf.Port)
+	log.Printf("using port %d from %s", mf.Port, manifest.FileName)
 	return nil
 }
 
-func (m *Manager) build(j *job, app *store.App, rel *store.Release) error {
+func (m *Manager) build(j *job, app *store.App, rel *store.Release, mf *manifest.Manifest) error {
 	dir := m.paths.App(app.Name).Release(rel.ID)
 	if app.Runtime == store.RuntimeDocker {
 		if _, err := m.docker.Version(j.ctx); err != nil {
 			return err
 		}
-		if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err != nil {
-			return errors.New("bundle has no Dockerfile")
+		opts := engine.BuildOptions{
+			Folder:     filepath.Join(dir, filepath.FromSlash(mf.Build.FolderPath())),
+			Dockerfile: filepath.Join(dir, filepath.FromSlash(mf.Build.DockerfilePath())),
+			Tag:        fmt.Sprintf("moonshed/%s:%s", app.Name, rel.ID),
 		}
-		rel.Image = fmt.Sprintf("moonshed/%s:%s", app.Name, rel.ID)
-		j.log.Printf("building image %s", rel.Image)
-		if err := m.docker.Build(j.ctx, dir, rel.Image, j.log); err != nil {
+		if mf.Build != nil {
+			opts.Stage, opts.Args = mf.Build.Stage, mf.Build.Args
+		}
+		if _, err := os.Stat(opts.Dockerfile); err != nil {
+			return fmt.Errorf("%s not found in the bundle", mf.Build.DockerfilePath())
+		}
+		rel.Image = opts.Tag
+		j.log.Printf("building image %s from %s", rel.Image, mf.Build.DockerfilePath())
+		if err := m.docker.Build(j.ctx, opts, j.log); err != nil {
 			return fmt.Errorf("docker build: %w", err)
 		}
 		return nil
@@ -269,7 +281,7 @@ func (m *Manager) build(j *job, app *store.App, rel *store.Release) error {
 			return err
 		}
 	}
-	if pre := rel.Manifest.Pre.Current(); pre != "" {
+	if pre := mf.Pre.Current(); pre != "" {
 		j.log.Printf("running pre")
 		if err := m.runScript(j.ctx, app, rel.ID, pre, j.log); err != nil {
 			return fmt.Errorf("pre: %w", err)
@@ -303,9 +315,9 @@ func (m *Manager) runScript(ctx context.Context, app *store.App, releaseID strin
 }
 
 // waitHealthy decides whether a freshly started release is good enough to keep.
-func (m *Manager) waitHealthy(ctx context.Context, app *store.App, mf *manifest.Manifest, log *logs.Stream) error {
+func (m *Manager) waitHealthy(ctx context.Context, app *store.App, h manifest.Health, log *logs.Stream) error {
 	eng := m.engineFor(app)
-	if mf == nil || mf.Health == nil {
+	if h.ProcessOnly() {
 		log.Printf("no health check configured, making sure the app stays up for 5s")
 		if err := sleep(ctx, 5*time.Second); err != nil {
 			return err
@@ -316,8 +328,7 @@ func (m *Manager) waitHealthy(ctx context.Context, app *store.App, mf *manifest.
 		return nil
 	}
 
-	h := mf.Health
-	timeout := max(30*time.Second, h.Interval*time.Duration(h.Retries))
+	timeout := max(30*time.Second, h.Grace.D()+h.Interval.D()*time.Duration(h.Failures))
 	deadline := time.Now().Add(timeout)
 	log.Printf("waiting up to %s for the health check to pass", timeout)
 	var lastErr error

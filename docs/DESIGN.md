@@ -15,7 +15,7 @@ Moonshed is a lightweight, self-hosted deploy platform like Dokploy, but:
 |---|---|
 | **Project** | A flat group of apps. |
 | **App** | Something you deploy. Has a name, runtime, port, env vars, domains. |
-| **Bundle** | A zip of the app: code + `app.yaml`. Uploaded, or created from a git checkout. |
+| **Bundle** | A zip of the app: code, plus `moonshed.yaml` and/or a Dockerfile. Uploaded, or created from a git checkout. |
 | **Release** | A bundle unpacked and built into a folder, ready to run. |
 | **Build** | Running `pre` for a release. Can be killed. Has its own log. |
 | **Deployment** | Stopping the old release and starting the new one, with a health check. |
@@ -23,35 +23,51 @@ Moonshed is a lightweight, self-hosted deploy platform like Dokploy, but:
 
 ---
 
-## 2. Bundle format: `app.yaml`
+## 2. App config: `moonshed.yaml`
 
-`app.yaml` sits at the root of the zip/repo. Only `run` is required. Unknown keys are rejected.
+`moonshed.yaml` sits at the root of the zip/repo (or the configured folder). Every key is optional, and unknown keys are rejected.
 
 ```yaml
-pre: |
+pre: |                  # native: runs on every deploy, before start (install deps, migrations)
   python -m venv .venv
   .venv/bin/pip install -r requirements.txt
-  .venv/bin/python manage.py migrate
+run: .venv/bin/gunicorn app:app --bind 0.0.0.0:$PORT    # native: the app itself
+post: echo "deployed $RELEASE_ID"                        # native: after the new version is healthy
 
-run: .venv/bin/gunicorn app:app --bind 0.0.0.0:$PORT
+port: 8080              # used when the app has no port set in the UI
 
-post: echo "deployed $RELEASE_ID"
-
-port: 8080            # optional; used when the app has no port set in the UI
-
-persist:
+persist:                # kept across deploys (folders end with /)
   - data/
-  - uploads/
   - config.ini
 
 health:
-  http: /healthz      # or: tcp: true
-  interval: 30s
-  timeout: 5s
-  retries: 3
+  http: /healthz        # or: tcp: true. Without a health block, only the process is checked.
+  interval: 30s         # default 30s
+  timeout: 5s           # default 5s
+  failures: 3           # failed checks in a row before the app is down; default 3
+  grace: 10s            # wait after start before the first check; default 10s
+restart_unhealthy: true # restart the app when it goes down; default false
+
+build:                  # Docker apps
+  dockerfile: docker/Dockerfile.prod   # path from the repo root; default <folder>/Dockerfile
+  folder: api                          # what the Dockerfile can COPY from; default the repo root
+  stage: runtime                       # optional: which stage of a multi-stage Dockerfile to build
+  args:                                # optional: build arguments (ARG in the Dockerfile)
+    NODE_ENV: production
 ```
 
 `health: /healthz` is shorthand for `health: { http: /healthz }`.
+
+### The file and the UI
+
+Every setting above can also be set in the app's UI. **A value set in the UI wins, then the file, then the default.** The UI shows "From moonshed.yaml" next to values taken from the file and "Changed here" with a way back to the file on overridden ones. Overrides are stored on the app (`apps.config`); a release keeps the file exactly as found in its bundle, and what runs is that file with the app's overrides on top.
+
+- **Build settings** (scripts, persist, `build`) apply on the next deploy.
+- **Health and restart settings** apply on the next check, without a deploy.
+- **Blocks replace as a whole:** an overridden `health` or `build` block replaces the file's block; scripts and `persist` override one by one.
+- **No file at all** is fine: an app can be configured entirely in the UI.
+
+In the UI, scripts and the runtime live in the **Build** card on Overview, the health check and auto-restart on **Monitoring**, versions to keep on **Deployments**, log retention on **Logs**, the port on Overview, and moving the app to another project behind the pencil next to its name.
 
 ### Script values
 
@@ -86,7 +102,7 @@ Dependencies are reinstalled on every deploy, the same as a Docker build. This k
 ### Environment injected into every script
 
 ```
-PORT         the app's port (set in the UI, or `port:` in app.yaml)
+PORT         the app's port (set in the UI, or `port:` in moonshed.yaml)
 APP_DIR      current release folder
 SHARED_DIR   persistent folder (survives updates)
 CACHE_DIR    persistent cache, optional for users (e.g. pip --cache-dir $CACHE_DIR)
@@ -107,14 +123,14 @@ RELEASE_ID
 
 For an app that runs in Docker:
 
-- **Dockerfile:** the bundle must contain one.
+- **Dockerfile:** `Dockerfile` at the root, or wherever `build.dockerfile` / `build.folder` point.
 - **Scripts:** `pre` / `run` / `post` are not used. The Dockerfile's `RUN` and `CMD`/`ENTRYPOINT` replace them.
-- **Build:** BuildKit through the Docker API → image `moonshed/<app>:<release-id>`. The output goes to the build log, and the build can be killed like a native one.
+- **Build:** BuildKit through the Docker API → image `moonshed/<app>:<release-id>`, with the configured folder, stage and build args. The output goes to the build log, and the build can be killed like a native one.
 - **Run:** a container created through the Docker API with:
   - the env vars from the UI, plus `PORT`;
   - port `-p <port>:<port>`;
   - `persist` paths bind-mounted from `shared/`.
-- **`app.yaml` is optional.** Only `persist` and `health` are read from it.
+- **`moonshed.yaml` is optional.** `persist`, `health`, `restart_unhealthy`, `port` and `build` are read from it.
 - **Docker must be installed.** If Docker is missing at deploy time, the build fails with a clear error.
 
 ---
@@ -126,7 +142,7 @@ For an app that runs in Docker:
 | **Native** | Child process of the platform, in its own process group | Child process of the platform, in a Job Object |
 | **Docker** | Docker Engine API (unix socket) | Docker Engine API (named pipe) |
 
-The runtime is detected on the first deploy: an `app.yaml` with a `run` script runs natively (even if a Dockerfile is also present), otherwise a Dockerfile runs in Docker. It can be forced in the app settings until the first deploy, and is fixed after that.
+The runtime is detected on the first deploy: a `run` command (from the file or the UI) runs natively, even if a Dockerfile is also present; otherwise a Dockerfile runs in Docker. It can be picked in the Build card. Switching a deployed app stops it and drops its release, since the other engine can't run it; the next deploy builds it for the new runtime.
 
 ### Native: the platform is the supervisor
 
@@ -228,7 +244,7 @@ log_level: "info"       # debug, info, warn or error
 Each app has one fixed port. A deploy causes a short gap while the old version stops and the new one starts. This is by design for v1.
 
 1. **Source:** a zip upload, or a git clone (webhook / manual). The bundle is stored in `bundles/`.
-2. **Unpack** into `releases/<id>/`, validate `app.yaml`, detect the runtime on the first deploy, and take the port from `app.yaml` if the app has none.
+2. **Unpack** into `releases/<id>/`, read `moonshed.yaml`, merge the app's UI settings on top, detect the runtime on the first deploy, and take the port from the file if the app has none.
 3. **Link** `persist` paths from `shared/`.
 4. **Build:** run `pre` (or `docker build`). Output streams to the build log. The build can be killed. The old version keeps running during the build.
 5. **Stop** the old release.
@@ -294,13 +310,13 @@ The proxy is an embedded Caddy server. Moonshed generates its Caddyfile from the
 
 ### Uptime
 
-- **Source:** the health check from `app.yaml`, run every `interval` (default 30s). Apps without a `health` section are checked for "process is running" every 30s.
+- **Source:** the app's health check (UI, else `moonshed.yaml`), run every `interval` (default 30s), after the `grace` period that follows each start. Without one, the check is "process is running", every 30s.
 - **After a successful deploy:** one check runs 5s later (if a health check is configured), so the status is known right away.
 - **Storage:** each check adds to the app's row for the current hour: passed and total. Individual checks are not stored. Kept 7 days.
 - **Uptime % = passed ÷ total checks.** Hours with no checks (not deployed, stopped, platform offline) are "No data", never counted as up.
 - **UI:** 24h (24 hourly bars) and 7d (7 daily bars), the current state (up / down / not checked yet), and incidents.
-- **Down:** `retries` consecutive failures opens an incident; the next success closes it.
-- **Optional auto-restart:** restart the app when it goes down (per-app setting).
+- **Down:** `failures` consecutive failed checks (default 3; 1 for the process check) opens an incident; the next success closes it.
+- **Optional auto-restart:** `restart_unhealthy` restarts an app that is running but down. A crashed process is restarted by its engine regardless.
 
 ---
 
@@ -378,14 +394,15 @@ settings       (key, value)     proxy_enabled, acme_email, panel_domain, panel_t
 apps           (id, name, runtime[''|native|docker], port, source[upload|git],
                 git_url, git_branch, git_subdir, git_token (encrypted), webhook_secret,
                 run_as_user, run_as_password (encrypted, Windows only),
-                keep_bundles, log_retention_days, auto_restart, backup_cron, backup_keep,
+                keep_bundles, log_retention_days, backup_cron, backup_keep,
+                config (JSON: settings changed in the UI on top of moonshed.yaml),
                 current_release_id, desired_state[running|stopped], created_at)
 env_vars       (app_id, key, value (encrypted))
 domains        (id, app_id, host, path, tls[letsencrypt|custom|none],
                 options (JSON: force_https, hsts, basic_auth, headers…), advanced (raw Caddyfile))
 
 bundles        (id, app_id, source[upload|git], git_commit, size, created_at)
-releases       (id, app_id, bundle_id, manifest (parsed app.yaml as JSON), image, created_at)
+releases       (id, app_id, bundle_id, manifest (the bundle's moonshed.yaml as JSON), image, created_at)
 deployments    (id, app_id, bundle_id, release_id, trigger, status, error,
                 created_at, started_at, finished_at)
                 trigger: upload | api | manual | github_app | github_webhook | gitlab_webhook | deploy_hook | redeploy

@@ -7,12 +7,14 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/SiddheshNan/moonshed/internal/backup"
 	"github.com/SiddheshNan/moonshed/internal/engine"
+	"github.com/SiddheshNan/moonshed/internal/manifest"
 	"github.com/SiddheshNan/moonshed/internal/metrics"
 	"github.com/SiddheshNan/moonshed/internal/store"
 )
@@ -31,6 +33,10 @@ type appView struct {
 	LastDeploy   *store.Deployment `json:"last_deployment"`
 	HasRunAsPass bool              `json:"has_run_as_password"`
 	Domains      []*domainView     `json:"domains"`
+
+	// File is moonshed.yaml of the running release, so the UI can show which values
+	// come from it and which were changed in the UI.
+	File *manifest.Manifest `json:"file"`
 }
 
 func (s *Server) view(app *store.App) (*appView, error) {
@@ -54,10 +60,12 @@ func (s *Server) view(app *store.App) (*appView, error) {
 		v.LastDeploy = last[0]
 	}
 	if app.CurrentReleaseID != "" {
-		if rel, err := s.Store.Release(app.CurrentReleaseID); err == nil && rel.Manifest != nil && rel.Manifest.Health != nil {
-			if h := rel.Manifest.Health; h.HTTP != "" {
+		if rel, err := s.Store.Release(app.CurrentReleaseID); err == nil {
+			v.File = rel.Manifest
+			switch h := manifest.Effective(rel.Manifest, app.Config).Check(); {
+			case h.HTTP != "":
 				v.HealthCheck = "HTTP " + h.HTTP
-			} else {
+			case h.TCP:
 				v.HealthCheck = "TCP"
 			}
 		}
@@ -115,9 +123,12 @@ type appInput struct {
 	RunAsPassword        *string `json:"run_as_password"`
 	KeepBundles          int     `json:"keep_bundles"`
 	LogRetentionDays     int     `json:"log_retention_days"`
-	AutoRestart          bool    `json:"auto_restart"`
 	BackupCron           string  `json:"backup_cron"`
 	BackupKeep           int     `json:"backup_keep"`
+
+	// Config replaces the app's UI overrides of moonshed.yaml as a whole; it's left nil by
+	// inputFrom so a request without it keeps them.
+	Config *manifest.Overrides `json:"config"`
 }
 
 // inputFrom fills an appInput with the app's current values, so an update request only
@@ -138,7 +149,6 @@ func inputFrom(app *store.App) appInput {
 		RunAsUser:            app.RunAsUser,
 		KeepBundles:          app.KeepBundles,
 		LogRetentionDays:     app.LogRetentionDays,
-		AutoRestart:          app.AutoRestart,
 		BackupCron:           app.BackupCron,
 		BackupKeep:           app.BackupKeep,
 	}
@@ -163,9 +173,22 @@ func (in *appInput) apply(app *store.App) {
 	}
 	app.KeepBundles = cmp.Or(in.KeepBundles, 5)
 	app.LogRetentionDays = cmp.Or(in.LogRetentionDays, 14)
-	app.AutoRestart = in.AutoRestart
 	app.BackupCron = strings.TrimSpace(in.BackupCron)
 	app.BackupKeep = cmp.Or(in.BackupKeep, 7)
+	if in.Config != nil {
+		app.Config = *in.Config
+	}
+}
+
+// dockerAvailable refuses the Docker runtime on a server without a running Docker.
+func (s *Server) dockerAvailable(r *http.Request, runtime string) error {
+	if runtime != store.RuntimeDocker {
+		return nil
+	}
+	if _, err := s.Docker.Version(r.Context()); err != nil {
+		return badRequest("Docker isn't installed or running on this server")
+	}
+	return nil
 }
 
 func validRuntime(r string) bool {
@@ -175,6 +198,9 @@ func validRuntime(r string) bool {
 func (s *Server) validateApp(app *store.App) error {
 	if app.Port < 0 || app.Port > 65535 {
 		return badRequest("port must be between 1 and 65535")
+	}
+	if err := app.Config.Validate(); err != nil {
+		return badRequest("%v", err)
 	}
 	if app.Source != store.SourceUpload && app.Source != store.SourceGit {
 		return badRequest("source must be upload or git")
@@ -225,6 +251,9 @@ func (s *Server) createApp(w http.ResponseWriter, r *http.Request) error {
 	if !validRuntime(in.Runtime) {
 		return badRequest("runtime must be native, docker, or empty to detect it from the bundle")
 	}
+	if err := s.dockerAvailable(r, in.Runtime); err != nil {
+		return err
+	}
 	if err := s.checkProject(in.ProjectID); err != nil {
 		return err
 	}
@@ -274,8 +303,14 @@ func (s *Server) updateApp(w http.ResponseWriter, r *http.Request) error {
 		if !validRuntime(in.Runtime) {
 			return badRequest("runtime must be native, docker, or empty to detect it from the bundle")
 		}
-		if app.CurrentReleaseID != "" {
-			return badRequest("the runtime can only be changed before the first deployment")
+		if in.Runtime == "" && app.CurrentReleaseID != "" {
+			return badRequest("a deployed app needs native or docker as its runtime")
+		}
+		if s.Deploy.Deploying(app.ID) {
+			return errorf(http.StatusConflict, "wait for the running deployment to finish")
+		}
+		if err := s.dockerAvailable(r, in.Runtime); err != nil {
+			return err
 		}
 	}
 	if err := s.checkProject(in.ProjectID); err != nil {
@@ -287,6 +322,13 @@ func (s *Server) updateApp(w http.ResponseWriter, r *http.Request) error {
 	in.apply(app)
 	if err := s.validateApp(app); err != nil {
 		return err
+	}
+	if before.Runtime != app.Runtime && before.CurrentReleaseID != "" {
+		old := before
+		if err := s.Deploy.SwitchRuntime(&old, app.Runtime); err != nil {
+			return err
+		}
+		app.CurrentReleaseID, app.DesiredState = "", store.StateStopped
 	}
 	if err := s.Store.UpdateApp(app); err != nil {
 		return err
@@ -319,7 +361,7 @@ func changedFields(a, b *store.App) string {
 	check("autodeploy", a.Autodeploy != b.Autodeploy)
 	check("run as user", a.RunAsUser != b.RunAsUser || a.RunAsPassword != b.RunAsPassword)
 	check("retention", a.KeepBundles != b.KeepBundles || a.LogRetentionDays != b.LogRetentionDays)
-	check("auto restart", a.AutoRestart != b.AutoRestart)
+	check("build and health settings", !reflect.DeepEqual(a.Config, b.Config))
 	check("backups", a.BackupCron != b.BackupCron || a.BackupKeep != b.BackupKeep)
 	if len(changed) == 0 {
 		return "no changes"

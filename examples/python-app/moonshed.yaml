@@ -17,4 +17,4 @@ health:
   http: /healthz
   interval: 30s
   timeout: 5s
-  retries: 3
+  failures: 3

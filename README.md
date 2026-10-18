@@ -68,7 +68,7 @@ Other commands:
 
 ## Deploy an app
 
-A bundle is a zip with `app.yaml` at the root (or a `Dockerfile` for Docker apps):
+Deploy from a git repository or a zip. Describe how to run it in a `moonshed.yaml` at the root, or set the same things in the app's Build settings; a `Dockerfile` alone also works:
 
 ```yaml
 pre: |
@@ -81,7 +81,7 @@ health:
   http: /healthz
 ```
 
-Upload it in the UI, or from CI with an API token (Settings → API tokens):
+Settings made in the UI override the file. Zips can be uploaded in the UI, or from CI with an API token:
 
 ```bash
 curl -fsS -H "Authorization: Bearer $MOONSHED_TOKEN" -H "Content-Type: application/zip" \

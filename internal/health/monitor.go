@@ -15,7 +15,6 @@ import (
 
 const (
 	tick            = 5 * time.Second
-	processInterval = 30 * time.Second
 	postDeployDelay = 5 * time.Second
 )
 
@@ -79,41 +78,44 @@ func (m *Monitor) Run(ctx context.Context) {
 }
 
 // CheckAfterDeploy runs one health check 5s after a successful deploy, so the app's
-// status is known right away instead of after a full interval. Only for apps with a
-// health check in app.yaml.
+// status is known right away instead of after a full interval. Only for HTTP and TCP checks.
 func (m *Monitor) CheckAfterDeploy(appID string) {
 	time.AfterFunc(postDeployDelay, func() {
 		app, err := m.store.App(appID)
 		if err != nil {
 			return
 		}
-		h, _, ok := m.checkConfig(app)
-		if !ok || h == nil {
+		c, ok := m.checkConfig(app)
+		if !ok || c.health.ProcessOnly() {
 			return
 		}
 		if s := m.claim(app, true); s != nil {
 			m.mu.Lock()
 			ctx := m.ctx
 			m.mu.Unlock()
-			m.check(ctx, app, h, s)
+			m.check(ctx, app, c, s)
 		}
 	})
 }
 
-// checkConfig returns the app's health check (nil means "process is alive") and how often
-// it runs, or false when the app isn't something we monitor right now.
-func (m *Monitor) checkConfig(app *store.App) (*manifest.Health, time.Duration, bool) {
+type checkConfig struct {
+	health  manifest.Health
+	restart bool
+}
+
+// checkConfig returns the app's health check, from moonshed.yaml of the running release
+// with the app's UI settings on top, or false when the app isn't monitored right now.
+// UI changes apply on the next check, without a deploy.
+func (m *Monitor) checkConfig(app *store.App) (checkConfig, bool) {
 	if app.DesiredState != store.StateRunning || app.CurrentReleaseID == "" || m.apps.Deploying(app.ID) {
-		return nil, 0, false
+		return checkConfig{}, false
 	}
 	rel, err := m.store.Release(app.CurrentReleaseID)
 	if err != nil {
-		return nil, 0, false
+		return checkConfig{}, false
 	}
-	if rel.Manifest != nil && rel.Manifest.Health != nil {
-		return rel.Manifest.Health, rel.Manifest.Health.Interval, true
-	}
-	return nil, processInterval, true
+	mf := manifest.Effective(rel.Manifest, app.Config)
+	return checkConfig{health: mf.Check(), restart: mf.RestartUnhealthy}, true
 }
 
 // claim marks a check as started and returns the app's state, or nil if one is already
@@ -148,23 +150,29 @@ func (m *Monitor) tick(ctx context.Context) {
 	}
 	active := map[string]bool{}
 	for _, app := range apps {
-		h, interval, ok := m.checkConfig(app)
+		c, ok := m.checkConfig(app)
 		if !ok {
 			continue
 		}
 		active[app.ID] = true
+		// Give a freshly started app its grace period before the first check.
+		if grace := c.health.Grace.D(); grace > 0 {
+			if st := m.apps.Status(app); !st.Since.IsZero() && time.Since(st.Since) < grace {
+				continue
+			}
+		}
 		s := m.claim(app, false)
 		if s == nil {
 			continue
 		}
 		m.mu.Lock()
-		due := !s.checking && time.Since(s.lastCheck) >= interval
+		due := !s.checking && time.Since(s.lastCheck) >= c.health.Interval.D()
 		if due {
 			s.checking, s.lastCheck = true, time.Now()
 		}
 		m.mu.Unlock()
 		if due {
-			go m.check(ctx, app, h, s)
+			go m.check(ctx, app, c, s)
 		}
 	}
 
@@ -180,17 +188,15 @@ func (m *Monitor) tick(ctx context.Context) {
 	}
 }
 
-func (m *Monitor) check(ctx context.Context, app *store.App, h *manifest.Health, s *state) {
-	retries := 1
+func (m *Monitor) check(ctx context.Context, app *store.App, c checkConfig, s *state) {
 	var err error
-	if h == nil {
+	if c.health.ProcessOnly() {
 		if st := m.apps.Status(app); st.State != engine.StateRunning {
 			err = errors.New("process is not running")
 		}
 	} else {
-		retries = h.Retries
 		var latency time.Duration
-		if latency, err = Probe(ctx, app.Port, h); err == nil {
+		if latency, err = Probe(ctx, app.Port, c.health); err == nil {
 			m.recorder.Record(m.target(app.ID), "health_ms", float64(latency.Microseconds())/1000)
 		}
 	}
@@ -205,7 +211,7 @@ func (m *Monitor) check(ctx context.Context, app *store.App, h *manifest.Health,
 		s.failures, s.down = 0, false
 	} else {
 		s.failures++
-		if s.failures >= retries {
+		if s.failures >= c.health.Failures {
 			s.down = true
 		}
 	}
@@ -224,7 +230,9 @@ func (m *Monitor) check(ctx context.Context, app *store.App, h *manifest.Health,
 		if err := m.store.OpenIncident(app.ID, err.Error()); err != nil {
 			slog.Error("open incident", "app", app.Name, "err", err)
 		}
-		if app.AutoRestart {
+		// A crashed process is restarted by its engine anyway; this covers apps that are
+		// running but failing their HTTP or TCP check.
+		if c.restart && !c.health.ProcessOnly() {
 			log.Printf("health: auto-restarting")
 			if err := m.apps.Restart(app); err != nil {
 				log.Printf("health: restart failed: %v", err)
