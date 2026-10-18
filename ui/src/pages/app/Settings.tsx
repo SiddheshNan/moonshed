@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from 'react';
-import { Button, Card, Group, NumberInput, PasswordInput, SegmentedControl, Select, SimpleGrid, Stack, Switch, Text, TextInput } from '@mantine/core';
+import { Button, Card, Group, PasswordInput, SimpleGrid, Stack, Text, TextInput } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 
 import { api, queryClient } from '../../api';
-import type { App, Project, ServerInfo } from '../../types';
+import type { App, ServerInfo } from '../../types';
 
 export function useSave(app: App) {
   return useMutation({
@@ -28,6 +28,7 @@ export function Section({
   onSave,
   saving,
   saveDisabled,
+  saveHint,
 }: {
   title: string;
   description?: string;
@@ -35,6 +36,8 @@ export function Section({
   onSave?: () => void;
   saving?: boolean;
   saveDisabled?: boolean;
+  // saveHint is a short note shown beside Save, e.g. when the change takes effect.
+  saveHint?: string;
 }) {
   return (
     <Card padding={0}>
@@ -48,9 +51,16 @@ export function Section({
           )}
         </div>
         {onSave && (
-          <Button size="sm" onClick={onSave} loading={saving} disabled={saveDisabled}>
-            Save
-          </Button>
+          <Group gap="sm" wrap="nowrap">
+            {saveHint && (
+              <Text size="xs" c="dimmed">
+                {saveHint}
+              </Text>
+            )}
+            <Button size="sm" onClick={onSave} loading={saving} disabled={saveDisabled}>
+              Save
+            </Button>
+          </Group>
         )}
       </Group>
       <Stack p="lg">{children}</Stack>
@@ -61,60 +71,9 @@ export function Section({
 export function AppSettings({ app }: { app: App }) {
   return (
     <Stack gap="lg" maw={760}>
-      <General app={app} />
       {app.runtime !== 'docker' && <RunAs app={app} />}
       <Danger app={app} />
     </Stack>
-  );
-}
-
-function General({ app }: { app: App }) {
-  const projects = useQuery({ queryKey: ['projects-list'], queryFn: () => api.get<Project[]>('/projects') });
-  const [form, setForm] = useState({
-    project_id: app.project_id,
-    runtime: app.runtime,
-    keep_bundles: app.keep_bundles,
-    log_retention_days: app.log_retention_days,
-    auto_restart: app.auto_restart,
-  });
-  const save = useSave(app);
-  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((f) => ({ ...f, [key]: value }));
-
-  return (
-    <Section title="General" onSave={() => save.mutate(form)} saving={save.isPending}>
-      <Select
-        label="Project"
-        data={(projects.data ?? []).map((p) => ({ value: p.id, label: p.name }))}
-        value={form.project_id}
-        onChange={(v) => v && set('project_id', v)}
-        allowDeselect={false}
-      />
-      {!app.current_release_id && (
-        <Stack gap={6}>
-          <Text size="sm" fw={500}>
-            Runtime
-          </Text>
-          <SegmentedControl
-            w="fit-content"
-            value={form.runtime}
-            onChange={(v) => set('runtime', v as App['runtime'])}
-            data={[
-              { value: '', label: 'Detect from bundle' },
-              { value: 'native', label: 'Native' },
-              { value: 'docker', label: 'Docker' },
-            ]}
-          />
-          <Text size="xs" c="dimmed">
-            Can't be changed after the first deploy.
-          </Text>
-        </Stack>
-      )}
-      <SimpleGrid cols={{ base: 1, sm: 2 }}>
-        <NumberInput label="Versions to keep" min={1} value={form.keep_bundles} onChange={(v) => set('keep_bundles', Number(v) || 1)} />
-        <NumberInput label="Keep logs for (days)" min={1} value={form.log_retention_days} onChange={(v) => set('log_retention_days', Number(v) || 1)} />
-      </SimpleGrid>
-      <Switch label="Restart automatically when the health check fails" checked={form.auto_restart} onChange={(e) => set('auto_restart', e.currentTarget.checked)} />
-    </Section>
   );
 }
 

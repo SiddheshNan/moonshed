@@ -6,7 +6,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { api, queryClient } from '../../api';
 import { PageHeader } from '../../components/PageHeader';
-import { timeAgo } from '../../format';
+import { TimeAgo } from '../../components/TimeAgo';
 import type { APIToken } from '../../types';
 
 export function TokensPage() {
@@ -67,8 +67,8 @@ function Tokens() {
           {tokens.data?.map((t) => (
             <Table.Tr key={t.id}>
               <Table.Td fw={500}>{t.name}</Table.Td>
-              <Table.Td c="dimmed">created {timeAgo(t.created_at)}</Table.Td>
-              <Table.Td c="dimmed">{t.last_used_at ? `used ${timeAgo(t.last_used_at)}` : 'never used'}</Table.Td>
+              <Table.Td c="dimmed"><TimeAgo iso={t.created_at} prefix="created " /></Table.Td>
+              <Table.Td c="dimmed">{t.last_used_at ? <TimeAgo iso={t.last_used_at} prefix="used " /> : 'never used'}</Table.Td>
               <Table.Td>
                 <Group justify="flex-end">
                   <ActionIcon variant="subtle" color="red" onClick={() => remove.mutate(t.id)}>

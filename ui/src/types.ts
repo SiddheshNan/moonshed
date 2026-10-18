@@ -1,5 +1,5 @@
 export type AppState = 'running' | 'stopped' | 'crashed' | 'starting';
-export type Runtime = 'native' | 'docker';
+export type Runtime = '' | 'native' | 'docker';
 export type Source = 'upload' | 'git';
 export type TLSMode = 'none' | 'letsencrypt' | 'custom';
 
@@ -93,7 +93,6 @@ export interface App {
   run_as_user: string;
   keep_bundles: number;
   log_retention_days: number;
-  auto_restart: boolean;
   backup_cron: string;
   backup_keep: number;
   current_release_id: string;
@@ -108,6 +107,53 @@ export interface App {
   has_run_as_password: boolean;
   domains: Domain[];
   webhook_secret?: string;
+  config: Overrides;
+  file: Manifest | null;
+}
+
+// moonshed.yaml, as found in the running release.
+export interface Manifest {
+  pre: Script;
+  run: Script;
+  post: Script;
+  persist: string[] | null;
+  port?: number;
+  health?: HealthCheck;
+  restart_unhealthy?: boolean;
+  build?: BuildConfig;
+}
+
+export interface Script {
+  linux?: string;
+  windows?: string;
+}
+
+// Durations are Go-style strings like "30s" or "1m0s".
+export interface HealthCheck {
+  http?: string;
+  tcp?: boolean;
+  interval?: string;
+  timeout?: string;
+  failures?: number;
+  grace?: string;
+}
+
+export interface BuildConfig {
+  dockerfile?: string;
+  folder?: string;
+  stage?: string;
+  args?: Record<string, string>;
+}
+
+// Settings changed in the UI on top of moonshed.yaml. A missing field falls back to the file.
+export interface Overrides {
+  pre?: string;
+  run?: string;
+  post?: string;
+  persist?: string[];
+  health?: HealthCheck;
+  restart_unhealthy?: boolean;
+  build?: BuildConfig;
 }
 
 export type Health = 'up' | 'down' | 'unknown';

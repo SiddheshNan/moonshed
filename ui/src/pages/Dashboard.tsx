@@ -8,7 +8,8 @@ import { api } from '../api';
 import { MetricChart, RangePicker } from '../components/Charts';
 import { PageHeader } from '../components/PageHeader';
 import { AppStatusBadge, DeployStatusBadge } from '../components/StatusBadge';
-import { elapsed, formatBytes, formatBytesShort, formatDuration, formatPercent, timeAgo } from '../format';
+import { TimeAgo } from '../components/TimeAgo';
+import { elapsed, formatBytes, formatBytesShort, formatDuration, formatPercent } from '../format';
 import { appPath } from '../paths';
 import { byProblem } from '../problems';
 import type { App, DeploymentRow, Project, ServerInfo, Series } from '../types';
@@ -124,7 +125,7 @@ export function Dashboard() {
                       <DeployStatusBadge status={d.status} />
                     </Table.Td>
                     <Table.Td c="dimmed" className="nowrap">
-                      {timeAgo(d.created_at)}
+                      <TimeAgo iso={d.created_at} />
                     </Table.Td>
                     <Table.Td c="dimmed" ta="right" className="nowrap">
                       {elapsed(d.started_at, d.finished_at)}

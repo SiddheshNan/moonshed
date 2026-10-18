@@ -18,9 +18,11 @@ import { Link } from 'react-router';
 import { api, queryClient } from '../../api';
 import { Commit } from '../../components/Commit';
 import { appLook, Dot } from '../../components/StatusBadge';
-import { formatBytes, formatPercent, summarizeError, timeAgo } from '../../format';
+import { TimeAgo } from '../../components/TimeAgo';
+import { formatBytes, formatPercent, summarizeError } from '../../format';
 import { appPath } from '../../paths';
 import type { App, Deployment } from '../../types';
+import { Build } from './Build';
 import { Source } from './Source';
 
 function Fact({ label, children, action }: { label: string; children: ReactNode; action?: ReactNode }) {
@@ -94,13 +96,15 @@ export function Overview({ app }: { app: App }) {
       <Facts app={app} deployed={deployed} onEditPort={() => setEditingPort(true)} />
       <PortModal app={app} opened={editingPort} onClose={() => setEditingPort(false)} />
       <Source key={`${app.source}-${app.git_url}-${app.github_installation_id}`} app={app} />
+      <Build key={`${app.runtime}-${JSON.stringify(app.config)}-${app.current_release_id}`} app={app} />
     </Stack>
   );
 }
 
 function status(app: App): ReactNode {
   const look = appLook(app);
-  const label = app.status.state === 'running' && app.status.since ? `Up ${timeAgo(app.status.since).replace(' ago', '')}` : look.label;
+  const up = app.status.state === 'running' && app.status.since;
+  const label = up ? <TimeAgo iso={app.status.since} prefix="Up " suffix={false} /> : look.label;
   return (
     <Group gap={8} wrap="nowrap">
       <Dot color={look.color} live={look.live} />
@@ -133,7 +137,18 @@ function Facts({ app, deployed, onEditPort }: { app: App; deployed: boolean; onE
           {app.runtime === 'docker' ? 'Docker' : app.runtime === 'native' ? 'Native process' : <Dimmed>Detected on first deploy</Dimmed>}
         </Fact>
         <Fact label="Health check">
-          {!deployed ? <Dimmed>—</Dimmed> : app.health_check || <Dimmed>Process only</Dimmed>}
+          {!deployed ? (
+            <Dimmed>—</Dimmed>
+          ) : (
+            app.health_check || (
+              <>
+                <Dimmed>Process running</Dimmed>{' '}
+                <Anchor component={Link} to={appPath(app.project_id, app.id, 'monitoring')} size="sm">
+                  Set up
+                </Anchor>
+              </>
+            )
+          )}
         </Fact>
         <Fact label="CPU">{measured ? formatPercent(app.stats.cpu, 2) : <Dimmed>—</Dimmed>}</Fact>
         <Fact label="Memory">{measured ? formatBytes(app.stats.memory) : <Dimmed>—</Dimmed>}</Fact>

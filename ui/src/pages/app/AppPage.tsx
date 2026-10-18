@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
-import { Alert, Badge, Button, Center, Loader, Modal, Stack, Tabs } from '@mantine/core';
+import { ActionIcon, Alert, Badge, Button, Center, Loader, Modal, Stack, Tabs, Tooltip } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconPlayerPlay, IconPlayerStop, IconRefresh, IconRocket } from '@tabler/icons-react';
+import { IconPencil, IconPlayerPlay, IconPlayerStop, IconRefresh, IconRocket } from '@tabler/icons-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Navigate, useNavigate, useParams } from 'react-router';
 
@@ -9,7 +9,8 @@ import { api, queryClient } from '../../api';
 import { PageHeader } from '../../components/PageHeader';
 import { Commit } from '../../components/Commit';
 import { AppStatusBadge } from '../../components/StatusBadge';
-import { runtimeLabel, timeAgo, triggerLabel } from '../../format';
+import { TimeAgo } from '../../components/TimeAgo';
+import { runtimeLabel, triggerLabel } from '../../format';
 import { appPath } from '../../paths';
 import type { App, Project } from '../../types';
 import { Backups } from './Backups';
@@ -17,6 +18,7 @@ import { Deployments } from './Deployments';
 import { Domains } from './Domains';
 import { Environment } from './Environment';
 import { Logs } from './Logs';
+import { MoveModal } from './MoveModal';
 import { Monitoring } from './Monitoring';
 import { Overview } from './Overview';
 import { UploadBundle } from './Source';
@@ -30,15 +32,19 @@ const tabs = [
   { value: 'environment', label: 'Environment' },
   { value: 'domains', label: 'Domains' },
   { value: 'backups', label: 'Backups' },
-  { value: 'settings', label: 'Settings' },
+  { value: 'advanced', label: 'Advanced' },
 ];
 
 // deployedSummary says what is running: when it was deployed and from which commit or upload.
 function deployedSummary(a: App): ReactNode {
   const d = a.deployed;
   if (!d) return a.current_release_id ? 'Deployed' : 'Not deployed yet';
-  const when = `Deployed ${timeAgo(d.finished_at ?? d.created_at)}`;
-  if (!d.git_commit) return `${when} · ${triggerLabel(d.trigger)}`;
+  const when = <TimeAgo iso={d.finished_at ?? d.created_at} prefix="Deployed " />;
+  if (!d.git_commit) return (
+    <>
+      {when} · {triggerLabel(d.trigger)}
+    </>
+  );
   return (
     <>
       {when} · {a.git_branch || 'main'} @ <Commit gitUrl={a.git_url} sha={d.git_commit} />
@@ -54,6 +60,7 @@ export function AppPage() {
   const projectId = params.projectId ?? '';
   const tab = params['*'] || 'overview';
   const [uploading, setUploading] = useState(false);
+  const [moving, setMoving] = useState(false);
   const app = useQuery({ queryKey: ['app', id], queryFn: () => api.get<App>(`/apps/${id}`), refetchInterval: 3000 });
   const projects = useQuery({ queryKey: ['projects-list'], queryFn: () => api.get<Project[]>('/projects') });
 
@@ -104,6 +111,11 @@ export function AppPage() {
                 {runtimeLabel(a.runtime)}
               </Badge>
             )}
+            <Tooltip label="Move to another project">
+              <ActionIcon onClick={() => setMoving(true)}>
+                <IconPencil size={16} />
+              </ActionIcon>
+            </Tooltip>
           </>
         }
         description={deployedSummary(a)}
@@ -179,13 +191,14 @@ export function AppPage() {
         <Tabs.Panel value="backups">
           <Backups app={a} />
         </Tabs.Panel>
-        <Tabs.Panel value="settings">
+        <Tabs.Panel value="advanced">
           <AppSettings app={a} />
         </Tabs.Panel>
       </Tabs>
       <Modal opened={uploading} onClose={() => setUploading(false)} title={`Deploy ${a.name}`} size="lg">
         <UploadBundle app={a} />
       </Modal>
+      <MoveModal app={a} opened={moving} onClose={() => setMoving(false)} />
     </Stack>
   );
 }

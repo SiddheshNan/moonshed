@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActionIcon, Badge, Button, Card, Code, Group, NumberInput, Stack, Table, Text, TextInput, Tooltip } from '@mantine/core';
+import { ActionIcon, Badge, Button, Card, Group, NumberInput, Stack, Table, Text, TextInput, Tooltip } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { IconDownload, IconRestore, IconTrash } from '@tabler/icons-react';
@@ -115,7 +115,7 @@ export function Backups({ app }: { app: App }) {
           <div>
             <Text fw={600}>Backups</Text>
             <Text size="sm" c="dimmed">
-              Backs up the paths listed under <Code>persist</Code> in app.yaml.
+              Backs up the app's persisted paths.
             </Text>
           </div>
           <Button onClick={() => create.mutate()} loading={create.isPending}>

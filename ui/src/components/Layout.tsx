@@ -19,7 +19,6 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { Spotlight, spotlight, type SpotlightActionData } from '@mantine/spotlight';
 import {
-  IconApps,
   IconCertificate,
   IconFolder,
   IconGitBranch,
@@ -69,7 +68,6 @@ export function Logo({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
 const home = [
   { to: '/', label: 'Dashboard', icon: IconLayoutDashboard, exact: true },
   { to: '/projects', label: 'Projects', icon: IconFolder },
-  { to: '/apps', label: 'Apps', icon: IconApps },
   { to: '/deployments', label: 'Deployments', icon: IconRocket },
   { to: '/requests', label: 'Requests', icon: IconTransfer },
 ];

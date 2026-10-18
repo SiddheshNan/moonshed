@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router';
 
 import { api, queryClient } from '../api';
 import { PageHeader } from '../components/PageHeader';
-import { timeAgo } from '../format';
+import { TimeAgo } from '../components/TimeAgo';
 import type { Project, ProjectSummary } from '../types';
 
 const sorts = [
@@ -64,7 +64,7 @@ export function ProjectsPage() {
             </Text>
             <Group justify="space-between" mt="md">
               <Text size="xs" c="dimmed">
-                Created {timeAgo(p.created_at)}
+                <TimeAgo iso={p.created_at} prefix="Created " />
               </Text>
               <Group gap="xs">
                 <Text size="sm" fw={500}>

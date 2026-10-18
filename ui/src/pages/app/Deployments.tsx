@@ -7,10 +7,13 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { api, queryClient } from '../../api';
 import { Commit } from '../../components/Commit';
+import { InlineSetting } from '../../components/InlineSetting';
 import { LogViewer } from '../../components/LogViewer';
 import { DeployStatusBadge, isActive } from '../../components/StatusBadge';
-import { elapsed, formatDateTime, summarizeError, timeAgo, triggerLabel } from '../../format';
+import { TimeAgo } from '../../components/TimeAgo';
+import { elapsed, formatDateTime, summarizeError, triggerLabel } from '../../format';
 import type { App, Bundle, Deployment } from '../../types';
+import { useSave } from './Settings';
 
 export function Deployments({ app }: { app: App }) {
   const [viewing, setViewing] = useState<Deployment | null>(null);
@@ -21,6 +24,7 @@ export function Deployments({ app }: { app: App }) {
   });
   const bundles = useQuery({ queryKey: ['bundles', app.id], queryFn: () => api.get<Bundle[]>(`/apps/${app.id}/bundles`) });
   const stored = new Set(bundles.data?.map((b) => b.id));
+  const save = useSave(app);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['deployments', app.id] });
@@ -57,11 +61,16 @@ export function Deployments({ app }: { app: App }) {
   return (
     <Stack gap="lg">
       <Card padding={0}>
-        <Group justify="space-between" p="md">
+        <Group justify="space-between" className="panel-header">
           <Text fw={600}>Deployments</Text>
-          <Text size="sm" c="dimmed">
-            The last {app.keep_bundles} versions can be redeployed
-          </Text>
+          <InlineSetting
+            label="Versions to keep"
+            value={app.keep_bundles}
+            saving={save.isPending}
+            onSave={(v, done) => save.mutate({ keep_bundles: v }, { onSuccess: done })}
+          >
+            The last {app.keep_bundles} versions can be redeployed ·
+          </InlineSetting>
         </Group>
         <Table.ScrollContainer minWidth={820}>
           <Table verticalSpacing="sm">
@@ -106,7 +115,7 @@ export function Deployments({ app }: { app: App }) {
                     </Table.Td>
                     <Table.Td className="nowrap">{triggerLabel(d.trigger)}</Table.Td>
                     <Table.Td className="nowrap" title={formatDateTime(d.created_at)}>
-                      {timeAgo(d.created_at)}
+                      <TimeAgo iso={d.created_at} />
                     </Table.Td>
                     <Table.Td className="nowrap">{elapsed(d.started_at, d.finished_at)}</Table.Td>
                     <Table.Td>

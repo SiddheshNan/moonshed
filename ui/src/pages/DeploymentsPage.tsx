@@ -10,7 +10,8 @@ import { Commit } from '../components/Commit';
 import { LogViewer } from '../components/LogViewer';
 import { PageHeader } from '../components/PageHeader';
 import { DeployStatusBadge, isActive } from '../components/StatusBadge';
-import { elapsed, formatDateTime, summarizeError, timeAgo, triggerLabel } from '../format';
+import { TimeAgo } from '../components/TimeAgo';
+import { elapsed, formatDateTime, summarizeError, triggerLabel } from '../format';
 import { appPath } from '../paths';
 import type { DeploymentRow } from '../types';
 
@@ -85,7 +86,7 @@ export function DeploymentsPage() {
                   </Table.Td>
                   <Table.Td className="nowrap">{triggerLabel(d.trigger)}</Table.Td>
                   <Table.Td className="nowrap" title={formatDateTime(d.created_at)}>
-                    {timeAgo(d.created_at)}
+                    <TimeAgo iso={d.created_at} />
                   </Table.Td>
                   <Table.Td className="nowrap">{elapsed(d.started_at, d.finished_at)}</Table.Td>
                   <Table.Td>

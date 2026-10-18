@@ -7,7 +7,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { api, queryClient } from '../../api';
 import { PageHeader } from '../../components/PageHeader';
-import { timeAgo } from '../../format';
+import { TimeAgo } from '../../components/TimeAgo';
 import type { User } from '../../types';
 
 export function UsersPage() {
@@ -77,7 +77,7 @@ function Users() {
                   </Text>
                 )}
               </Table.Td>
-              <Table.Td c="dimmed">added {timeAgo(u.created_at)}</Table.Td>
+              <Table.Td c="dimmed"><TimeAgo iso={u.created_at} prefix="added " /></Table.Td>
               <Table.Td>
                 <Group gap="xs" justify="flex-end">
                   <Button size="xs" variant="subtle" onClick={() => setPasswordFor(u)}>

@@ -5,11 +5,14 @@ import { useQuery } from '@tanstack/react-query';
 
 import { api } from '../../api';
 import { ansi } from '../../components/ansi';
+import { InlineSetting } from '../../components/InlineSetting';
 import { LogViewer } from '../../components/LogViewer';
 import type { App } from '../../types';
+import { useSave } from './Settings';
 
 export function Logs({ app }: { app: App }) {
   const [day, setDay] = useState<string | null>('live');
+  const save = useSave(app);
   const days = useQuery({ queryKey: ['log-days', app.id], queryFn: () => api.get<string[]>(`/apps/${app.id}/logs/days`) });
   const history = useQuery({
     queryKey: ['logs', app.id, day],
@@ -32,6 +35,16 @@ export function Logs({ app }: { app: App }) {
             allowDeselect={false}
             data={[{ value: 'live', label: 'Live tail' }, ...(days.data ?? []).map((d) => ({ value: d, label: d }))]}
           />
+          {day === 'live' && (
+            <InlineSetting
+              label="Keep logs for (days)"
+              value={app.log_retention_days}
+              saving={save.isPending}
+              onSave={(v, done) => save.mutate({ log_retention_days: v }, { onSuccess: done })}
+            >
+              Kept for {app.log_retention_days} days ·
+            </InlineSetting>
+          )}
           {day && day !== 'live' && (
             <Button
               size="xs"

@@ -22,7 +22,7 @@ import { useSearchParams } from 'react-router';
 import { api, queryClient } from '../../api';
 import { CredentialModal } from '../../components/CredentialModal';
 import { PageHeader } from '../../components/PageHeader';
-import { timeAgo } from '../../format';
+import { TimeAgo } from '../../components/TimeAgo';
 import type { GitCredential, GitOverview } from '../../types';
 
 export function GitSettingsPage() {
@@ -101,7 +101,7 @@ function GitHubApps({ data }: { data: GitOverview | undefined }) {
                   {app.name}
                 </Anchor>
                 <Text size="xs" c="dimmed">
-                  Owned by {app.owner} · created {timeAgo(app.created_at)}
+                  Owned by {app.owner} · <TimeAgo iso={app.created_at} prefix="created " />
                 </Text>
               </div>
               <Group gap={4}>
@@ -212,7 +212,7 @@ function Credentials({ credentials }: { credentials: GitCredential[] }) {
                 <Table.Td fw={500}>{c.name}</Table.Td>
                 <Table.Td>{c.host}</Table.Td>
                 <Table.Td c="dimmed">{c.username}</Table.Td>
-                <Table.Td c="dimmed">{timeAgo(c.created_at)}</Table.Td>
+                <Table.Td c="dimmed"><TimeAgo iso={c.created_at} /></Table.Td>
                 <Table.Td>
                   <Group gap={4} justify="flex-end" wrap="nowrap">
                     <ActionIcon onClick={() => setEditing(c)}>

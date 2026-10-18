@@ -7,6 +7,7 @@ import { MetricChart, RangePicker, StatCard, UptimeBars } from '../../components
 import { appLook } from '../../components/StatusBadge';
 import { elapsed, formatBytes, formatBytesShort, formatDateTime, formatPercent, formatSmallPercent } from '../../format';
 import type { App, AppMetrics, Health, Uptime } from '../../types';
+import { HealthCheck } from './HealthCheck';
 
 const healthLook: Record<Health, { color: string; label: string }> = {
   up: { color: 'green', label: 'Up' },
@@ -91,6 +92,8 @@ export function Monitoring({ app }: { app: App }) {
           </Stack>
         )}
       </Card>
+
+      <HealthCheck key={`${JSON.stringify(app.config)}-${app.current_release_id}`} app={app} />
 
       <Group justify="space-between">
         <Text fw={600}>Resources</Text>

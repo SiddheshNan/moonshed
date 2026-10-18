@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router';
 import { api } from '../api';
 import { PageHeader } from '../components/PageHeader';
 import { AppStatusBadge, deployLabels } from '../components/StatusBadge';
-import { timeAgo } from '../format';
+import { TimeAgo } from '../components/TimeAgo';
 import { appPath } from '../paths';
 import { byProblem } from '../problems';
 import type { App, Project } from '../types';
@@ -74,7 +74,7 @@ export function AppsPage() {
                     <AppStatusBadge app={app} />
                   </Table.Td>
                   <Table.Td c="dimmed" className="nowrap">
-                    {app.last_deployment ? `${deployLabels[app.last_deployment.status]} · ${timeAgo(app.last_deployment.created_at)}` : 'Never'}
+                    {app.last_deployment ? <TimeAgo iso={app.last_deployment.created_at} prefix={`${deployLabels[app.last_deployment.status]} · `} /> : 'Never'}
                   </Table.Td>
                 </Table.Tr>
               ))}
