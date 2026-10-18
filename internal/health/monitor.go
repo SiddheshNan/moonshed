@@ -125,7 +125,10 @@ func (m *Monitor) claim(app *store.App, force bool) *state {
 	defer m.mu.Unlock()
 	s, ok := m.states[app.ID]
 	if !ok || s.release != app.CurrentReleaseID {
-		s = &state{release: app.CurrentReleaseID, down: ok && s.down, checked: ok && s.checked}
+		// Without state in memory (e.g. after a platform restart), an open incident means
+		// the app was last seen down, so the next passing check closes it.
+		down := ok && s.down || !ok && m.store.HasOpenIncident(app.ID)
+		s = &state{release: app.CurrentReleaseID, down: down, checked: ok && s.checked}
 		if ok {
 			// A new release: the post-deploy check runs first, then the normal schedule.
 			s.lastCheck = time.Now()

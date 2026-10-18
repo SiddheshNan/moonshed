@@ -8,9 +8,11 @@
 
 ![Moonshed dashboard](docs/screenshots/dashboard.png)
 
-| App overview | Deployments | Monitoring |
-|---|---|---|
-| ![App overview](docs/screenshots/app-overview.png) | ![Deployments](docs/screenshots/deployments.png) | ![Monitoring](docs/screenshots/monitoring.png) |
+| App overview | Deployments |
+|---|---|
+| ![App overview](docs/screenshots/app-overview.png) | ![Deployments](docs/screenshots/deployments.png) |
+| **Monitoring** | **Backups** |
+| ![Monitoring](docs/screenshots/monitoring.png) | ![Backups](docs/screenshots/backups.png) |
 
 ## Why Moonshed
 
@@ -22,12 +24,14 @@ Moonshed is a lightweight alternative to platforms like Dokploy, built to run co
 
 ## Features
 
-- **Deploy** from a zip upload, a git repo, or CI with an API token. Builds have their own log and can be killed.
-- **Safe rollouts.** A new release starts with a health check, and you can redeploy earlier versions.
-- **Live logs** streamed to the UI.
-- **Built-in reverse proxy** with domains and automatic HTTPS (Let's Encrypt), or your own certificate.
-- **Monitoring.** CPU, memory, disk and network graphs, uptime from real health checks, and a request log.
-- **Backups** for each app and for Moonshed itself, on a schedule or on demand.
+- **Deploy** from GitHub (through a GitHub App), any git URL, a zip upload, or CI with an API token. Pushes can deploy automatically, and each deployment links to its commit.
+- **Configure in the repo or the UI.** `moonshed.yaml` describes how to build, run and check the app; the same settings can be changed in the UI, which wins over the file.
+- **Docker builds** with BuildKit: custom Dockerfile path, build folder, stage and build arguments.
+- **Safe rollouts.** A new version must pass its health check before it replaces the old one, and earlier versions can be redeployed.
+- **Live logs** for every app and every deployment.
+- **Built-in reverse proxy** (Caddy) with domains and automatic HTTPS (Let's Encrypt), or your own certificate.
+- **Monitoring.** CPU, memory, disk and network graphs, uptime and incidents from real health checks, optional auto-restart, and a request log.
+- **Backups** of an app's code, data, env vars and logs, as an archive that unpacks to a plain copy of the app. On a schedule or on demand, restorable part by part. Moonshed backs up its own database too.
 - **Teams.** Projects, users, API tokens and an audit log.
 
 ## Install
@@ -75,10 +79,14 @@ pre: |
   python3 -m venv .venv
   .venv/bin/pip install -r requirements.txt
 run: .venv/bin/python app.py
-persist:
+port: 8000
+persist:                 # kept across deploys
   - data/
 health:
   http: /healthz
+  interval: 30s
+  failures: 3
+restart_unhealthy: true
 ```
 
 Settings made in the UI override the file. Zips can be uploaded in the UI, or from CI with an API token:
@@ -88,7 +96,7 @@ curl -fsS -H "Authorization: Bearer $MOONSHED_TOKEN" -H "Content-Type: applicati
   --data-binary @app.zip https://panel.example.com/api/apps/$APP_ID/deploy
 ```
 
-Scripts can be one-liners, multi-line blocks, a path to a `.sh`/`.ps1`/`.cmd` file, or per-OS (`linux:` / `windows:`). See [examples/python-app](examples/python-app) for a working bundle.
+Scripts can be one-liners, multi-line blocks, a path to a `.sh`/`.ps1`/`.cmd` file, or per-OS (`linux:` / `windows:`). Docker apps can add a `build:` block (`dockerfile`, `folder`, `stage`, `args`). [DESIGN.md](docs/DESIGN.md) lists every key, and [examples/python-app](examples/python-app) is a working example.
 
 ## Development
 
@@ -97,11 +105,11 @@ go run ./cmd/moonshed serve -e development
 cd ui && npm install && npm run dev
 ```
 
-Open http://localhost:5050. See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and conventions.
+Open http://localhost:5050. In development the panel forwards the UI to the Vite dev server (`ui:` in `runtime/config/development.yaml`), so changes show up live. See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and conventions.
 
 ## Docs
 
-[DESIGN.md](docs/DESIGN.md) explains how it works: the bundle format, runtimes, the deploy flow, the proxy, monitoring, backups and the API.
+[DESIGN.md](docs/DESIGN.md) explains how it works: `moonshed.yaml`, runtimes, the deploy flow, the proxy, monitoring, backups and the API.
 
 ## Contributing
 

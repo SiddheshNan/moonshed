@@ -1,5 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 
+import { setOffline, unreachableMessage } from './connection';
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -26,7 +28,21 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     init.body = JSON.stringify(body);
     init.headers = { 'Content-Type': 'application/json' };
   }
-  const res = await fetch(`/api${path}`, init);
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, init);
+  } catch {
+    setOffline(true);
+    throw new ApiError(unreachableMessage, 0);
+  }
+  // Moonshed answers errors with JSON; anything else came from something in between,
+  // like a proxy that couldn't reach it.
+  const fromMoonshed = res.ok || res.headers.get('Content-Type')?.includes('application/json');
+  if (!fromMoonshed && res.status >= 500) {
+    setOffline(true);
+    throw new ApiError(unreachableMessage, 0);
+  }
+  setOffline(false);
   if (res.status === 401 && !path.startsWith('/auth/')) {
     queryClient.invalidateQueries({ queryKey: ['auth'] });
   }
@@ -62,11 +78,11 @@ export function uploadBundle(appId: string, file: File, onProgress: (pct: number
       try {
         message = JSON.parse(xhr.responseText).error ?? message;
       } catch {
-        // keep the status text
+        if (xhr.status >= 500) message = unreachableMessage;
       }
       reject(new ApiError(message, xhr.status));
     };
-    xhr.onerror = () => reject(new ApiError('Upload failed', 0));
+    xhr.onerror = () => reject(new ApiError(unreachableMessage, 0));
     const form = new FormData();
     form.append('bundle', file);
     xhr.send(form);

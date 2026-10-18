@@ -14,9 +14,17 @@ type Incident struct {
 	Reason string `json:"reason"`
 }
 
+// OpenIncident records that the app went down, unless an incident is already open.
 func (s *Store) OpenIncident(appID, reason string) error {
-	_, err := s.db.Exec("INSERT INTO incidents (id, app_id, down_at, reason) VALUES (?, ?, ?, ?)", NewID(), appID, Now(), reason)
+	_, err := s.db.Exec(`INSERT INTO incidents (id, app_id, down_at, reason) SELECT ?, ?, ?, ?
+		WHERE NOT EXISTS (SELECT 1 FROM incidents WHERE app_id = ? AND up_at IS NULL)`, NewID(), appID, Now(), reason, appID)
 	return err
+}
+
+func (s *Store) HasOpenIncident(appID string) bool {
+	var n int
+	s.db.QueryRow("SELECT COUNT(*) FROM incidents WHERE app_id = ? AND up_at IS NULL", appID).Scan(&n)
+	return n > 0
 }
 
 func (s *Store) CloseIncident(appID string) error {

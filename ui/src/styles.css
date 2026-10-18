@@ -223,3 +223,20 @@ body {
 .nowrap {
   white-space: nowrap;
 }
+
+/* Shown while the API is unreachable */
+.offline-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: var(--mantine-radius-md);
+  border: 1px solid color-mix(in srgb, var(--mantine-color-orange-6) 40%, transparent);
+  background: var(--app-surface);
+  box-shadow: 0 6px 24px -8px rgba(0, 0, 0, 0.5);
+}

@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from 'react-router';
 
 import { api } from './api';
 import { Layout } from './components/Layout';
+import { OfflineBanner, Unreachable } from './components/Offline';
 import { AppPage } from './pages/app/AppPage';
 import { AppsPage } from './pages/AppsPage';
 import { Dashboard } from './pages/Dashboard';
@@ -31,12 +32,21 @@ export function App() {
       </Center>
     );
   }
-  if (!auth.data?.user) {
-    return <Login setup={auth.data?.setup_required ?? false} />;
+  if (!auth.data) {
+    return <Unreachable />;
+  }
+  if (!auth.data.user) {
+    return (
+      <>
+        <OfflineBanner />
+        <Login setup={auth.data.setup_required} />
+      </>
+    );
   }
 
   return (
     <Layout user={auth.data.user} version={auth.data.version}>
+      <OfflineBanner />
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/projects" element={<ProjectsPage />} />
