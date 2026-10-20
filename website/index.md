@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: Moonshed
-  text: Self-hosted app deployment in one binary.
-  tagline: SQLite and a built-in proxy. Runs on Linux and Windows, even on 1 core and 1 GB of RAM.
+  text: A small, self-hosted platform (PaaS) for deploying your apps.
+  tagline: Single binary with built-in proxy, and SQLite. Runs on Linux and Windows, even on 1 core and 1 GB of RAM.
   image:
     src: /logo.svg
     alt: Moonshed
@@ -27,11 +27,11 @@ features:
   - title: Safe deploys
     details: A new version only replaces the old one after its health check passes.
   - title: Domains and HTTPS
-    details: Built-in Caddy with Let's Encrypt or your own certificates.
+    details: Built-in Caddy Reverse Proxy with Let's Encrypt or your own certificates.
   - title: Monitoring
-    details: Resource graphs, uptime from health checks, and a request log.
+    details: Resource graphs, uptime from health checks, and logs.
   - title: Backups
-    details: App and platform backups that unpack to plain files.
+    details: App and platform backups.
 ---
 
 <div class="home-section">

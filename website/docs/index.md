@@ -1,11 +1,11 @@
 # What is Moonshed?
 
-Moonshed deploys and runs your apps on your own server, like Dokploy or Coolify but much smaller. It's a single binary with SQLite, runs on Linux and Windows, and is fine on 1 core and 1 GB of RAM.
+Moonshed is a self-hosted platform for deploying your apps, in the same space as Dokploy or Coolify, but built to stay small. It is a single binary with SQLite, it runs on Linux and Windows, and it is comfortable on a server with 1 core and 1 GB of RAM.
 
 ![Moonshed dashboard](/screenshots/dashboard.png)
 
 ::: warning Early development
-Expect rough edges and breaking changes between versions.
+Moonshed is pre-release. Expect rough edges and breaking changes between versions.
 :::
 
 ## What you get
