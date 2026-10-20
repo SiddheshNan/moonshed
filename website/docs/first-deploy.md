@@ -43,12 +43,12 @@ If the app has a `Dockerfile` and no `run` command, Moonshed builds and runs it 
 In the panel, click **New app**, give it a name (lowercase letters, digits and dashes) and pick or create a project. Under **Deploy from**, choose:
 
 - **Zip upload** to upload the code yourself,
-- **GitHub** to pick a repository through the GitHub App (see [Git and webhooks](/docs/git)), or
+- **GitHub App** to pick a repository from GitHub (see [Git and webhooks](/docs/git)), or
 - **Git URL** for any other git host.
 
 ## 3. Deploy
 
-Click **Deploy**. For a zip app, drop the zip of your app folder into the dialog. For a git app, Moonshed clones the branch.
+Click **Deploy**. For a zip app, choose the zip of your app folder and click **Deploy** again. For a git app, Moonshed clones the branch.
 
 The deployment shows up on the **Deployments** tab with a live log. Moonshed:
 

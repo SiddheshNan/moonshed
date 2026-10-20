@@ -2,7 +2,7 @@
 
 <h1 align="center">Moonshed</h1>
 
-<p align="center">A small, self-hosted platform (PaaS) for deploying your apps.<br>One binary and SQLite. Runs on Linux and Windows.</p>
+<p align="center">Self-hosted app deployment in one binary.<br>Runs on Linux and Windows.</p>
 
 <p align="center">
   <a href="https://moonshed.siddhesh.me">Website</a> ·
@@ -11,50 +11,34 @@
   <a href="CHANGELOG.md">Changelog</a>
 </p>
 
-> **Status: early development.** Moonshed is pre-release. Expect rough edges and breaking changes.
+> Moonshed is in early development. Expect rough edges and breaking changes.
 
 ![Moonshed dashboard](website/public/screenshots/dashboard.png)
 
 ## Why Moonshed
 
-Platforms like Dokploy and Coolify are great, but they bring a stack with them: Postgres, Redis, Traefik and Docker before your first app is even running. Moonshed is built for the small server or a minimal setup.
+Tools like Dokploy and Coolify need Postgres, Redis, Traefik and Docker before your first app runs. Moonshed is a single binary with SQLite and a built-in Caddy proxy. It runs fine on 1 core and 1 GB of RAM, and uses about 15 MB of memory itself.
 
-- **One binary, one SQLite file.** The reverse proxy (Caddy) is built in. Nothing else to install or keep running.
-- **Light.** Comfortable on 1 core and 1 GB of RAM. The platform itself used about 15 MB of memory running three apps.
-- **Docker is optional.** Run an app as a plain process that Moonshed supervises (like how pm2 does), or as a container. You choose per app.
-- **Linux and Windows.** Runs as a systemd unit or a Windows service, and Native Process apps run on either.
-- **Config in the repo or the UI.** A `moonshed.yaml` next to your code, the same settings in the panel, or just a Dockerfile.
-
+Each app runs either as a Native Process that Moonshed supervises (like pm2) or as a Docker container. Settings go in a `moonshed.yaml` in your repo or in the panel.
 
 ## Features
 
-**Deploy**
-- From GitHub through a GitHub App (private repos without personal tokens), any git URL, a zip upload, or CI with an API token.
-- Deploy on every push, or see "new commit waiting" and deploy when you're ready.
-- Docker builds with BuildKit: custom Dockerfile path, build folder, stage and build arguments.
-- A new version has to pass its health check before it replaces the old one; if it fails, the old version is started again.
-- Redeploy any of the last few versions with one click.
-
-**Run**
-- Built-in reverse proxy (Caddy) with domains, path routing and automatic HTTPS (Let's Encrypt), or your own certificate.
-- Per-domain options: HTTPS redirect, HSTS, compression, basic auth, IP allow lists, headers, body size limits, and raw Caddyfile for the rest.
-- Encrypted env vars, persistent data folders that survive deploys, and per-app OS users for Native Process apps.
-- Live logs for every app and every deployment.
-
-**Watch**
-- CPU, memory, disk and network graphs for the server and each app, plus traffic per domain.
-- Uptime and incidents from health checks, with optional auto-restart.
-- A request log you can turn on per app.
-
-**Keep safe**
-- App backups of code, data, env vars and logs, on a schedule or on demand. They unpack to a plain copy of the app and restore part by part.
-- Platform backups of Moonshed's own database.
-- Projects, users, API tokens and an audit log of every change.
+- Deploy from a GitHub App, any git URL, a zip upload or CI
+- Deploy on every push, or deploy new commits when you're ready
+- A new version only replaces the old one after its health check passes
+- Redeploy any recent version
+- Docker builds with BuildKit
+- Domains, path routing and automatic HTTPS
+- Per-domain redirects, compression, basic auth, IP allow lists and headers
+- Encrypted env vars and data folders that survive deploys
+- Live logs, resource graphs, uptime and a request log
+- App and platform backups, on a schedule or on demand
+- Projects, users, API tokens and an audit log
 
 | App overview | Deployments |
 |---|---|
 | ![App overview](website/public/screenshots/app-overview.png) | ![Deployments](website/public/screenshots/deployments.png) |
-| **Monitoring** | **Backups** |
+| Monitoring | Backups |
 | ![Monitoring](website/public/screenshots/monitoring.png) | ![Backups](website/public/screenshots/backups.png) |
 
 ## Quick start
@@ -74,7 +58,7 @@ Releases are built for Linux (x86-64 and ARM64) and Windows (x86-64). See the [i
 
 ## Deploy an app
 
-Describe the app in a `moonshed.yaml` at its root, or set the same things in the app's Build settings:
+Add a `moonshed.yaml` to your app, or set the same things in the panel:
 
 ```yaml
 pre: |
@@ -89,30 +73,26 @@ health:
 restart_unhealthy: true
 ```
 
-Then create the app in the panel, point it at a repository or upload a zip, and press Deploy. From CI, upload a zip with an API token:
+Create the app in the panel, pick a repository or upload a zip, and click Deploy. From CI, upload a zip with an API token:
 
 ```bash
 curl -fsS -H "Authorization: Bearer $MOONSHED_TOKEN" -H "Content-Type: application/zip" \
   --data-binary @app.zip https://panel.example.com/api/apps/$APP_ID/deploy
 ```
 
-[examples/](examples) has working apps to try: a [Flask hello world](examples/flask-hello), a [FastAPI todo list](examples/fastapi-todo) backed by SQLite, and a [Snake game](examples/node-snake) on Node and Express. The [moonshed.yaml reference](https://moonshed.siddhesh.me/docs/reference/moonshed-yaml) lists every key.
+To try it, deploy one of the [examples](examples): a Flask hello world, a FastAPI todo list or a Snake game in Node. The [moonshed.yaml reference](https://moonshed.siddhesh.me/docs/reference/moonshed-yaml) lists every key.
 
-## Good to know
+## Current limits
 
-Moonshed keeps things simple on purpose. Today it:
-
-- runs on **one server**; there is no multi-server mode yet,
-- has a **short gap during a deploy** while the old version stops and the new one starts,
-- has **no resource limits** per app yet,
-- doesn't sandbox Native Process apps; give an app its own OS user to limit what it can touch.
-
-These are on the list for later versions.
+- One server only.
+- A short gap during each deploy while the old version stops.
+- No per-app CPU or memory limits.
+- Native Process apps aren't sandboxed. Give an app its own OS user to limit what it can touch.
 
 ## Documentation
 
-- [Docs](https://moonshed.siddhesh.me/docs/): guides for installing, deploying, domains, monitoring and backups. The source is in [website/](website).
-- [DESIGN.md](docs/DESIGN.md): how Moonshed works inside, for contributors.
+- [Docs](https://moonshed.siddhesh.me/docs/): install, deploy, domains, monitoring and backups. Source in [website/](website).
+- [DESIGN.md](docs/DESIGN.md): how Moonshed works inside.
 
 Run the docs site locally:
 

@@ -13,8 +13,6 @@ The easiest way to deploy from GitHub is to connect a GitHub App. Clones then us
 3. Install it on the accounts you want to deploy from and choose which repositories Moonshed may read. Use **Install on another account** later to add more.
 4. When creating an app, choose **GitHub App** under **Deploy from** and pick the repository and branch.
 
-The owner only decides who manages the GitHub App's settings. The same app can be installed on any number of accounts and organizations.
-
 All pushes arrive at one webhook, `POST /api/hooks/github`, signed with the GitHub App's secret.
 
 ::: warning
@@ -25,9 +23,7 @@ GitHub has to reach your panel over HTTPS to send webhooks. Give the panel a dom
 
 For GitLab, Bitbucket, Gitea or anything else, choose **Git URL** and paste the repository URL. Public repositories need nothing else.
 
-For private repositories, add a **git login** under **Settings › Git › Other git hosts**: the host, your username and a personal access token made on that host with read access to repositories. Pick it as the app's **Git login**. Logins are saved once, stored encrypted, and can be shared between apps.
-
-Git logins are only for cloning. They are different from [API tokens](/docs/security#api-tokens), which let scripts and CI use Moonshed.
+For private repositories, add a **git login** under **Settings › Git**: your username and a personal access token from that host. Then pick it as the app's **Git login**. One login can be used by many apps.
 
 ## Deploying on push
 

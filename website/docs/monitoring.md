@@ -58,7 +58,7 @@ Samples are rolled up in memory and only the rollups are stored, so storage stay
 | 5 minutes | 48 hours | 24h, 48h |
 | 30 minutes | 7 days | 7d |
 
-Each point on a chart covers a slice of time (5 seconds up to 30 minutes, depending on the range). CPU and memory charts show two lines: **average** (solid) is the average over that slice, and **highest** (dashed) is the highest reading in it, so short spikes still show on long ranges. The info icon next to the chart title says how long one point is.
+Charts show the average for each point. CPU and app memory charts also show the highest reading as a dashed line, so short spikes don't get lost on long ranges.
 
 ## Request log
 

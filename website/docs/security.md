@@ -18,7 +18,7 @@ It prints a new random password.
 
 Tokens for CI and scripts are made under **Settings › API tokens**. They start with `msh_`, are shown once, and only a hash is stored. Use one as `Authorization: Bearer msh_...`. See [Deploying from CI](/docs/ci).
 
-A token can do everything a signed-in user can, so give each pipeline its own. API tokens are not used for cloning repositories; that's what the GitHub App and [git logins](/docs/git#other-git-hosts) are for.
+A token has full access, so give each pipeline its own.
 
 ## Projects
 
