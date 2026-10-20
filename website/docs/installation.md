@@ -18,13 +18,15 @@ Download the latest release and unpack it where Moonshed should live. Everything
 
 ```bash [Linux]
 cd /opt
-curl -fsSL https://github.com/SiddheshNan/moonshed/releases/latest/download/moonshed-linux-amd64.tar.gz | sudo tar -xz
+tag=$(curl -fsSL "https://api.github.com/repos/SiddheshNan/moonshed/releases?per_page=1" | grep -m1 '"tag_name"' | cut -d'"' -f4)
+curl -fsSL "https://github.com/SiddheshNan/moonshed/releases/download/$tag/moonshed-linux-amd64.tar.gz" | sudo tar -xz
 cd moonshed
 ```
 
 ```powershell [Windows]
 # In an Administrator PowerShell
-Invoke-WebRequest https://github.com/SiddheshNan/moonshed/releases/latest/download/moonshed-windows-amd64.zip -OutFile moonshed.zip
+$tag = (Invoke-RestMethod "https://api.github.com/repos/SiddheshNan/moonshed/releases?per_page=1")[0].tag_name
+Invoke-WebRequest "https://github.com/SiddheshNan/moonshed/releases/download/$tag/moonshed-windows-amd64.zip" -OutFile moonshed.zip
 Expand-Archive moonshed.zip -DestinationPath C:\
 cd C:\moonshed
 ```

@@ -2,7 +2,7 @@
 
 <h1 align="center">Moonshed</h1>
 
-<p align="center">Self-hosted app deployment in one binary.<br>Runs on Linux and Windows.</p>
+<p align="center">A small, self-hosted platform (PaaS) for deploying your apps.<br>One binary and SQLite. Runs on Linux and Windows.</p>
 
 <p align="center">
   <a href="https://moonshed.siddhesh.me">Website</a> ·
@@ -11,29 +11,30 @@
   <a href="CHANGELOG.md">Changelog</a>
 </p>
 
-> Moonshed is in early development. Expect rough edges and breaking changes.
+>  **Status: early development.** Moonshed is pre-release.  Expect rough edges and breaking changes.
 
 ![Moonshed dashboard](website/public/screenshots/dashboard.png)
 
 ## Why Moonshed
 
-Tools like Dokploy and Coolify need Postgres, Redis, Traefik and Docker before your first app runs. Moonshed is a single binary with SQLite and a built-in Caddy proxy. It runs fine on 1 core and 1 GB of RAM, and uses about 15 MB of memory itself.
+Tools like Dokploy and Coolify need Postgres, Redis, Traefik and Docker before your first app runs. Moonshed is a single binary with SQLite and a built-in Caddy reverse proxy. It runs fine on 1 core and 1 GB of RAM.
 
-Each app runs either as a Native Process that Moonshed supervises (like pm2) or as a Docker container. Settings go in a `moonshed.yaml` in your repo or in the panel.
+Each app runs either as a Native Process that Moonshed supervises (like pm2) or as a Docker container. The app can be simply configured using `moonshed.yaml` in your repo, or from directly on the moonshed webui.
 
 ## Features
 
 - Deploy from a GitHub App, any git URL, a zip upload or CI
-- Deploy on every push, or deploy new commits when you're ready
-- A new version only replaces the old one after its health check passes
-- Redeploy any recent version
-- Docker builds with BuildKit
+- Supports app to be deployed as a Native Process or Docker container
+- A new version of app only replaces the old one (after its health check passes)
+- Redeploy any older version of app
+- Docker builds support with BuildKit
 - Domains, path routing and automatic HTTPS
-- Per-domain redirects, compression, basic auth, IP allow lists and headers
-- Encrypted env vars and data folders that survive deploys
-- Live logs, resource graphs, uptime and a request log
+- Health checks, logs, resource graphs and uptime monitoring per app
+- persistent data folders and encrypted environment variables that survive deploys
 - App and platform backups, on a schedule or on demand
 - Projects, users, API tokens and an audit log
+
+
 
 | App overview | Deployments |
 |---|---|
@@ -47,7 +48,8 @@ Download the latest release on your server and install it as a service:
 
 ```bash
 cd /opt
-curl -fsSL https://github.com/SiddheshNan/moonshed/releases/latest/download/moonshed-linux-amd64.tar.gz | sudo tar -xz
+tag=$(curl -fsSL "https://api.github.com/repos/SiddheshNan/moonshed/releases?per_page=1" | grep -m1 '"tag_name"' | cut -d'"' -f4)
+curl -fsSL "https://github.com/SiddheshNan/moonshed/releases/download/$tag/moonshed-linux-amd64.tar.gz" | sudo tar -xz
 cd moonshed
 sudo ./moonshed install -e production
 ```
@@ -58,7 +60,7 @@ Releases are built for Linux (x86-64 and ARM64) and Windows (x86-64). See the [i
 
 ## Deploy an app
 
-Add a `moonshed.yaml` to your app, or set the same things in the panel:
+Add a `moonshed.yaml` to your app, or set the same things in the webui:
 
 ```yaml
 pre: |
@@ -82,12 +84,12 @@ curl -fsS -H "Authorization: Bearer $MOONSHED_TOKEN" -H "Content-Type: applicati
 
 To try it, deploy one of the [examples](examples): a Flask hello world, a FastAPI todo list or a Snake game in Node. The [moonshed.yaml reference](https://moonshed.siddhesh.me/docs/reference/moonshed-yaml) lists every key.
 
-## Current limits
+## Current limitations
 
-- One server only.
-- A short gap during each deploy while the old version stops.
+- One server only, no clustering or multi-server deployments.
+- A short gap during each deploy while the old version stops, this is by design on v1
 - No per-app CPU or memory limits.
-- Native Process apps aren't sandboxed. Give an app its own OS user to limit what it can touch.
+- Native Process apps aren't sandboxed. You will need to give an app its own OS user to limit what it can touch.
 
 ## Documentation
 
