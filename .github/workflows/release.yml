@@ -28,7 +28,7 @@ jobs:
           echo "BUILD=$build" >> "$GITHUB_ENV"
           python3 scripts/build.py --version "$GITHUB_REF_NAME" --build "$build"
 
-      # Archive names carry no version, so releases/latest/download/<name> always works.
+      # Archive names carry no version, so install commands only need the tag.
       # Each one unpacks to a moonshed/ folder.
       - name: Package
         working-directory: dist
@@ -49,12 +49,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         # Re-running the workflow for a tag replaces the release's files with the new build.
+        # Every release is a GitHub pre-release until 1.0, so releases/latest stays empty and
+        # the docs find the newest tag through the API instead.
         run: |
           title="Moonshed $GITHUB_REF_NAME (build $BUILD)"
           files=(dist/*.tar.gz dist/*.zip dist/SHA256SUMS)
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
-            gh release edit "$GITHUB_REF_NAME" --title "$title"
+            gh release edit "$GITHUB_REF_NAME" --title "$title" --prerelease
           else
-            gh release create "$GITHUB_REF_NAME" "${files[@]}" --title "$title" --generate-notes --verify-tag
+            gh release create "$GITHUB_REF_NAME" "${files[@]}" --title "$title" --generate-notes --verify-tag --prerelease
           fi
