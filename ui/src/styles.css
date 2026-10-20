@@ -205,6 +205,9 @@ body {
 .fact-value {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+  /* Room inside the truncate clip for the status dot's ping ring, without moving the text. */
+  padding: 6px;
+  margin: -6px;
 }
 
 /* Title row of a card: the title on the left, its actions on the right, a divider below */

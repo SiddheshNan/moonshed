@@ -19,6 +19,7 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { Spotlight, spotlight, type SpotlightActionData } from '@mantine/spotlight';
 import {
+  IconArchive,
   IconCertificate,
   IconFolder,
   IconGitBranch,
@@ -29,7 +30,6 @@ import {
   IconMoon,
   IconRocket,
   IconSearch,
-  IconSettings,
   IconSun,
   IconTransfer,
   IconUsers,
@@ -73,13 +73,13 @@ const home = [
 ];
 
 const settings = [
-  { to: '/settings', label: 'General', icon: IconSettings, exact: true },
-  { to: '/settings/proxy', label: 'Proxy', icon: IconWorld },
+  { to: '/settings/proxy', label: 'Reverse Proxy (Caddy)', icon: IconWorld },
   { to: '/settings/git', label: 'Git', icon: IconGitBranch },
   { to: '/settings/certificates', label: 'Certificates', icon: IconCertificate },
   { to: '/settings/users', label: 'Users', icon: IconUsers },
   { to: '/settings/tokens', label: 'API tokens', icon: IconKey },
   { to: '/settings/audit', label: 'Audit log', icon: IconListDetails },
+  { to: '/settings/backups', label: 'Backups', icon: IconArchive },
 ];
 
 function NavSection({ title, items, onNavigate }: { title: string; items: typeof home; onNavigate: () => void }) {
@@ -128,7 +128,7 @@ function Search() {
     ...[...home, ...settings].map((item) => ({
       id: `page-${item.to}`,
       label: item.label,
-      description: item.to.startsWith('/settings') && item.to !== '/settings' ? 'Settings' : 'Page',
+      description: item.to.startsWith('/settings') ? 'Settings' : 'Page',
       leftSection: <item.icon size={16} />,
       onClick: () => navigate(item.to),
     })),

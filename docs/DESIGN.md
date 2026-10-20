@@ -2,9 +2,9 @@
 
 Moonshed is a lightweight, self-hosted deploy platform like Dokploy, but:
 
-- **One Go binary + SQLite.** No Postgres, Redis or separate proxy; the reverse proxy (Caddy) is built in, and Docker is optional.
+- **One binary + SQLite.** No Postgres, Redis or separate proxy; the reverse proxy (Caddy) is built in, and Docker is optional.
 - **Runs on Linux and Windows.**
-- **Apps run natively or in Docker**, detected per app from the bundle.
+- **Apps run as a Native Process or in Docker**, detected per app from the bundle.
 - **Small footprint.** Must run comfortably on 1 core / 1GB RAM.
 
 ---
@@ -28,11 +28,11 @@ Moonshed is a lightweight, self-hosted deploy platform like Dokploy, but:
 `moonshed.yaml` sits at the root of the zip/repo (or the configured folder). Every key is optional, and unknown keys are rejected.
 
 ```yaml
-pre: |                  # native: runs on every deploy, before start (install deps, migrations)
+pre: |                  # Native Process: runs on every deploy, before start (install deps, migrations)
   python -m venv .venv
   .venv/bin/pip install -r requirements.txt
-run: .venv/bin/gunicorn app:app --bind 0.0.0.0:$PORT    # native: the app itself
-post: echo "deployed $RELEASE_ID"                        # native: after the new version is healthy
+run: .venv/bin/gunicorn app:app --bind 0.0.0.0:$PORT    # Native Process: the app itself
+post: echo "deployed $RELEASE_ID"                        # Native Process: after the new version is healthy
 
 port: 8080              # used when the app has no port set in the UI
 
@@ -125,7 +125,7 @@ For an app that runs in Docker:
 
 - **Dockerfile:** `Dockerfile` at the root, or wherever `build.dockerfile` / `build.folder` point.
 - **Scripts:** `pre` / `run` / `post` are not used. The Dockerfile's `RUN` and `CMD`/`ENTRYPOINT` replace them.
-- **Build:** BuildKit through the Docker API → image `moonshed/<app>:<release-id>`, with the configured folder, stage and build args. The output goes to the build log, and the build can be killed like a native one.
+- **Build:** BuildKit through the Docker API → image `moonshed/<app>:<release-id>`, with the configured folder, stage and build args. The output goes to the build log, and the build can be killed like a Native Process one.
 - **Run:** a container created through the Docker API with:
   - the env vars from the UI, plus `PORT`;
   - port `-p <port>:<port>`;
@@ -139,14 +139,14 @@ For an app that runs in Docker:
 
 | Runtime | Linux | Windows |
 |---|---|---|
-| **Native** | Child process of the platform, in its own process group | Child process of the platform, in a Job Object |
+| **Native Process** | Child process of the platform, in its own process group | Child process of the platform, in a Job Object |
 | **Docker** | Docker Engine API (unix socket) | Docker Engine API (named pipe) |
 
-The runtime is detected on the first deploy: a `run` command (from the file or the UI) runs natively, even if a Dockerfile is also present; otherwise a Dockerfile runs in Docker. It can be picked in the Build card. Switching a deployed app stops it and drops its release, since the other engine can't run it; the next deploy builds it for the new runtime.
+The runtime is detected on the first deploy: a `run` command (from the file or the UI) runs as a Native Process, even if a Dockerfile is also present; otherwise a Dockerfile runs in Docker. It can be picked in the Build card. Switching a deployed app stops it and drops its release, since the other engine can't run it; the next deploy builds it for the new runtime.
 
-### Native: the platform is the supervisor
+### Native Process: the platform is the supervisor
 
-The platform runs as a system service (systemd on Linux, Windows service on Windows) and starts on boot. It supervises native apps directly, like pm2:
+The platform runs as a system service (systemd on Linux, Windows service on Windows) and starts on boot. It supervises Native Process apps directly, like pm2:
 
 - **On platform start:** start every app that should be running.
 - **Running `run`:** with the app's env, working dir = the release folder.
@@ -163,7 +163,7 @@ The platform runs as a system service (systemd on Linux, Windows service on Wind
 
 When the platform itself restarts (crash or upgrade), it stops its apps and starts them again. This is the same as Docker's default behaviour when its daemon restarts.
 
-### Run as OS user (native apps)
+### Run as OS user (Native Process apps)
 
 - **Setting:** per app, optional. If empty, the app runs as the platform's service account.
 - **Which scripts:** `pre`, `run` and `post` all run as that user, so files created during the build have the right owner.
@@ -275,14 +275,14 @@ Each app has one fixed port. A deploy causes a short gap while the old version s
 
 The proxy is an embedded Caddy server. Moonshed generates its Caddyfile from the database, so Caddy handles HTTP/2, HTTP/3, WebSockets and certificates while Moonshed stays the only thing to configure.
 
-- **Turning it on:** the user decides whether the proxy is enabled (Settings › Proxy). When it's off, apps are reached directly on their port.
+- **Turning it on:** the user decides whether the proxy is enabled (Settings › Reverse Proxy (Caddy)). When it's off, apps are reached directly on their port.
 - **Domains:** each app can have one or more domains (like Dokploy), each with a path prefix (default `/`). The proxy forwards to `127.0.0.1:<app port>`; apps without a port get no routes.
 - **TLS options per domain:**
   - **Let's Encrypt:** automatic issue and renewal (HTTP-01).
   - **Custom cert:** uploaded per domain (cert + key as PEM, or a PFX), checked to actually cover the host and not be expired. Stored per host, so paths on the same host share it. Removed automatically when no domain uses it any more.
   - **None:** plain HTTP.
 - **Domain options:** force HTTPS (on by default), HSTS, www redirect, compression, strip the path prefix, basic auth, IP allow list, request/response header rules and a max body size. Anything else can be added as raw Caddyfile directives per domain ("advanced").
-- **Global options:** trusted proxies, raw Caddy global options and extra site blocks, all in Settings › Proxy. The generated Caddyfile can be viewed there.
+- **Global options:** trusted proxies, raw Caddy global options and extra site blocks, all in Settings › Reverse Proxy (Caddy). The generated Caddyfile can be viewed there.
 - **Safety:** every change is validated before it's saved. If the running config fails only because of raw Caddyfile someone typed, the proxy runs without those parts and shows the error, so a bad snippet can't take every app offline.
 - **Reloads:** an unchanged config is not reloaded, since a reload closes idle keep-alive connections.
 - **Panel:** always reachable on `panel_addr` (default `:5050`, plain HTTP), even if the proxy is off or misconfigured. Bind it to `127.0.0.1:5050` to keep it off the network. Optionally it can also get a domain through the proxy (with Let's Encrypt, a custom certificate or plain HTTP); both ways keep working.
@@ -306,7 +306,7 @@ The proxy is an embedded Caddy server. Moonshed generates its Caddyfile from the
 | 30m | 7 days | 7d |
 
 - **Storage is fixed:** about 2,000 rows per app or server, ever. Stored in `metrics.db`.
-- **Charts** draw the bucket average, with the bucket peak as a dashed line.
+- **Charts** draw the bucket average, with the bucket max as a dashed line, labelled "(average)" and "(highest)" in the legend; an info tooltip on the title says how long one bucket is for the chosen range.
 
 ### Uptime
 
@@ -325,8 +325,8 @@ The proxy is an embedded Caddy server. Moonshed generates its Caddyfile from the
 An app's source is a **zip upload** (always available) or a **git repository**.
 
 **Git sources:**
-- **GitHub App:** Settings › Git › Connect GitHub creates a private GitHub App through GitHub's manifest flow, then you install it on accounts or repos. Clones use short-lived installation tokens, so private repos need no personal token, and apps get a repo and branch picker. All pushes arrive at one webhook, `POST /api/hooks/github`, verified with the app's webhook secret. GitHub must reach the panel (its public domain) for webhooks.
-- **Git URL + token:** for GitLab, Bitbucket, Gitea or anything else. Tokens are saved once as named credentials in Settings › Git and picked per app. Public repos need none.
+- **GitHub App:** Settings › Git creates a private GitHub App through GitHub's manifest flow, owned by the user's personal account or an organization they pick, then you install it on accounts or repos. Clones use short-lived installation tokens, so private repos need no personal token, and apps get a repo and branch picker. All pushes arrive at one webhook, `POST /api/hooks/github`, verified with the app's webhook secret. GitHub must reach the panel (its public domain) for webhooks.
+- **Git URL + git login:** for GitLab, Bitbucket, Gitea or anything else. A git login (host, username, personal access token) is saved once as a named credential in Settings › Git › Other git hosts and picked per app. Public repos need none. The UI calls these "git logins", never "tokens", to keep them apart from API tokens.
 - **Autodeploy (per app):** on, every push to the branch deploys; off, the push is shown on the app ("new commit waiting") and you press Deploy.
 
 **Hooks for a single app**, `POST /api/hooks/apps/<id>`:
@@ -354,7 +354,7 @@ Flat groups of apps. None exist until you create one, and every app must be crea
 
 ## Audit log
 
-Every change is recorded with who did it (user, API token, or webhook), when, from which IP, the action, the target and a short detail. Env var changes list the keys, never values. Failed logins are recorded too. Kept for one year.
+Every change is recorded with who did it (user, API token, or webhook), when, from which IP, the action, the target and a short detail. Env var changes list the keys, never values. Failed logins are recorded too. Kept forever.
 
 ---
 
@@ -390,7 +390,7 @@ Backups live in `runtime/backups/`.
 - **Other users:** local accounts. All users are admins.
 - **API tokens:** for CI / push deploys, prefixed `msh_`. Only a hash is stored.
 - **Env vars:** encrypted at rest with AES-GCM using `secret.key`.
-- **Isolation:** native apps are not sandboxed. By default they run as the platform's service account. Set "run as OS user" per app (section 3) to limit what an app can touch.
+- **Isolation:** Native Process apps are not sandboxed. By default they run as the platform's service account. Set "run as OS user" per app (section 3) to limit what an app can touch.
 
 ---
 
@@ -516,7 +516,7 @@ moonshed version
 | Git | `go-git` |
 | Docker | Official Docker Go client + BuildKit client |
 | Cron | `robfig/cron` |
-| UI | React + Vite + Mantine (`ui/`), served from `runtime/web/`. Sidebar: Dashboard, Projects, Apps, Deployments, Requests; Settings: General, Proxy, Git, Certificates, Users, API tokens, Audit log; ⌘K search |
+| UI | React + Vite + Mantine (`ui/`), served from `runtime/web/`. Sidebar: Dashboard, Projects, Apps, Deployments, Requests; Settings: Reverse Proxy (Caddy) (incl. panel access), Git, Certificates, Users, API tokens, Audit log, Backups; each settings section has its own Save; ⌘K search |
 
 Target memory use: under 50MB RSS for the platform itself (measured ~15MB with 3 apps).
 

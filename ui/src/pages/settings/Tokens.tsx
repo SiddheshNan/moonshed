@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ActionIcon, Alert, Button, Card, Code, Group, Stack, Table, Text, TextInput } from '@mantine/core';
+import { ActionIcon, Alert, Anchor, Button, Card, Code, Group, Stack, Table, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconTrash } from '@tabler/icons-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router';
 
 import { api, queryClient } from '../../api';
 import { PageHeader } from '../../components/PageHeader';
@@ -40,7 +41,16 @@ function Tokens() {
         <div>
           <Text fw={600}>Tokens</Text>
           <Text size="sm" c="dimmed">
-            Send as <Code>Authorization: Bearer &lt;token&gt;</Code>.
+            Let scripts and CI pipelines use Moonshed without your password, for example to deploy from GitHub Actions after a build. A token can do
+            everything a signed-in user can, so give each pipeline its own and delete the ones you no longer use. They're sent as{' '}
+            <Code>Authorization: Bearer msh_…</Code>.
+          </Text>
+          <Text size="sm" c="dimmed" mt={6}>
+            Cloning a private repository doesn't need one of these: use the GitHub App or a git login in{' '}
+            <Anchor component={Link} to="/settings/git" size="sm">
+              Settings › Git
+            </Anchor>
+            .
           </Text>
         </div>
         {created && (

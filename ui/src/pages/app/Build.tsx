@@ -35,7 +35,7 @@ export function Build({ app }: { app: App }) {
     const run = () => save.mutate({ runtime, config: draft });
     if (deployed && runtime !== app.runtime) {
       modals.openConfirmModal({
-        title: `Switch to ${runtime === 'docker' ? 'Docker' : 'native'}?`,
+        title: `Switch to ${runtime === 'docker' ? 'Docker' : 'Native Process'}?`,
         children: <Text size="sm">The app stops now. Deploy again to start it with the new runtime.</Text>,
         labels: { confirm: 'Switch and stop', cancel: 'Cancel' },
         confirmProps: { color: 'red' },
@@ -73,21 +73,21 @@ export function Build({ app }: { app: App }) {
           onChange={(v) => setRuntime(v as Runtime)}
           data={[
             ...(deployed ? [] : [{ value: '', label: 'Detect' }]),
-            { value: 'native', label: 'Native' },
+            { value: 'native', label: 'Native Process' },
             { value: 'docker', label: 'Docker', disabled: noDocker && runtime !== 'docker' },
           ]}
         />
         {runtime === '' && (
           <Text size="xs" c="dimmed">
             {noDocker
-              ? "Runs natively. Docker isn't installed or running on this server."
-              : 'A run command means native, otherwise a Dockerfile means Docker.'}
+              ? "Runs as a Native Process. Docker isn't installed or running on this server."
+              : 'A run command means Native Process, otherwise a Dockerfile means Docker.'}
           </Text>
         )}
         {runtime !== '' && noDocker && (
           <Text size="xs" c={runtime === 'docker' ? 'red' : 'dimmed'}>
             {runtime === 'docker'
-              ? "Docker isn't installed or running on this server, so this app can't build or start. Start Docker, or switch to native."
+              ? "Docker isn't installed or running on this server, so this app can't build or start. Start Docker, or switch to Native Process."
               : "Docker isn't installed or running on this server."}
           </Text>
         )}
@@ -106,7 +106,7 @@ export function Build({ app }: { app: App }) {
           </Field>
           <Field
             label="Persisted paths (optional)"
-            hint="Kept across deploys, one per line. End folders with /."
+            hint="Kept across deploys, one per line. End folders with /"
             origin={<Origin changed={draft.persist !== undefined} inFile={!!file?.persist?.length} onReset={() => reset('persist')} />}
           >
             <Textarea

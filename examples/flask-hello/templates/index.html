@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hello from {{ app }}</title>
+  <style>
+    :root { --bg: #fafafa; --card: #fff; --text: #18181b; --muted: #71717a; --border: #e4e4e7; --accent: #4f46e5; --ok: #16a34a; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #09090b; --card: #18181b; --text: #fafafa; --muted: #a1a1aa; --border: #27272a; --accent: #818cf8; --ok: #4ade80; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font: 15px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    main { width: 100%; max-width: 560px; padding: 32px 16px; }
+    .status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 20%, transparent); }
+    h1 { margin: 12px 0 4px; font-size: 36px; letter-spacing: -0.02em; }
+    h1 span { color: var(--accent); }
+    .lead { margin: 0 0 28px; color: var(--muted); }
+    .visits { font-size: 15px; margin: 0 0 20px; }
+    .visits b { font-size: 22px; font-variant-numeric: tabular-nums; }
+    dl { display: grid; grid-template-columns: max-content 1fr; margin: 0; background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    dt, dd { margin: 0; padding: 10px 14px; border-top: 1px solid var(--border); }
+    dt { color: var(--muted); }
+    dd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; word-break: break-all; }
+    dt:first-of-type, dd:first-of-type { border-top: 0; }
+    footer { margin-top: 20px; font-size: 13px; color: var(--muted); }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+<main>
+  <div class="status"><span class="dot"></span>Running on Moonshed</div>
+  <h1>Hello from <span>{{ app }}</span></h1>
+  <p class="lead">A small Flask app deployed as a native process. Redeploy it and watch the release change while the visit count carries on.</p>
+  <p class="visits">Visit <b>#{{ visits }}</b> <span class="lead">· stored in <code>data/</code>, kept across deploys</span></p>
+  <dl>
+    <dt>Release</dt><dd>{{ release }}</dd>
+    <dt>Started</dt><dd>{{ started }} ({{ uptime }} ago)</dd>
+    <dt>Host</dt><dd>{{ host }}</dd>
+    <dt>Platform</dt><dd>{{ platform }}</dd>
+    <dt>Python</dt><dd>{{ python }}</dd>
+    <dt>Port</dt><dd>{{ port }}</dd>
+  </dl>
+  <footer>Also available as JSON at <a href="/api/info">/api/info</a>. Health check: <a href="/healthz">/healthz</a>.</footer>
+</main>
+</body>
+</html>

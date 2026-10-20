@@ -18,13 +18,15 @@ It prints a new random password.
 
 Tokens for CI and scripts are made under **Settings › API tokens**. They start with `msh_`, are shown once, and only a hash is stored. Use one as `Authorization: Bearer msh_...`. See [Deploying from CI](/docs/ci).
 
+A token has full access, so give each pipeline its own.
+
 ## Projects
 
 Every app belongs to a project, a simple group of apps. Projects can only be deleted when they're empty.
 
 ## Audit log
 
-**Settings › Audit log** records every change: who made it (a user, an API token or a webhook), when, from which IP, and what changed. Failed logins are recorded too. Env var changes list the keys, never the values. Entries are kept for a year.
+**Settings › Audit log** records every change: who made it (a user, an API token or a webhook), when, from which IP, and what changed. Failed logins are recorded too. Env var changes list the keys, never the values.
 
 ## Secrets at rest
 
@@ -36,4 +38,4 @@ Without it the encrypted values can't be read. Platform backups include it, so t
 
 ## App isolation
 
-Native apps aren't sandboxed. By default they run as the same account as Moonshed. Set [Run as OS user](/docs/native-apps#running-as-another-os-user) per app to limit what each one can touch.
+Native Process apps aren't sandboxed. By default they run as the same account as Moonshed. Set [Run as OS user](/docs/native-apps#running-as-another-os-user) per app to limit what each one can touch.

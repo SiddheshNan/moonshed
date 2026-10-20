@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Moonshed: a lightweight self-hosted deploy platform (think Dokploy) shipped as one Go binary + SQLite, running on Linux and Windows (macOS for local dev only). Apps run either as supervised native processes or as Docker containers. [docs/DESIGN.md](docs/DESIGN.md) is the authoritative spec (bundle format, deploy flow, proxy, metrics tiers, API list); read the relevant section before changing behavior.
+Moonshed: a lightweight self-hosted deploy platform (think Dokploy) shipped as one binary + SQLite, running on Linux and Windows (macOS for local dev only). Apps run either as supervised native processes or as Docker containers. [docs/DESIGN.md](docs/DESIGN.md) is the authoritative spec (bundle format, deploy flow, proxy, metrics tiers, API list); read the relevant section before changing behavior.
 
 ## Commands
 

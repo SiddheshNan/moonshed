@@ -83,9 +83,10 @@ func (m *Manager) cloneBundle(ctx context.Context, app *store.App, d *store.Depl
 	commit := head.Hash().String()
 	d.GitCommit = commit
 	if c, err := repo.CommitObject(head.Hash()); err == nil {
-		d.GitMessage, _, _ = strings.Cut(strings.TrimSpace(c.Message), "\n")
+		d.GitMessage = strings.TrimSpace(c.Message)
 	}
-	log.Printf("checked out %s %s", commit[:12], d.GitMessage)
+	subject, _, _ := strings.Cut(d.GitMessage, "\n")
+	log.Printf("checked out %s %s", commit[:12], subject)
 
 	src := tmp
 	if app.GitSubdir != "" {

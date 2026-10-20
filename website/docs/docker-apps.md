@@ -42,4 +42,4 @@ The file is optional. When present, Moonshed reads `port`, `persist`, `health`, 
 
 ## Switching runtimes
 
-Switching an app between native and Docker in the **Build** card stops the app and drops its current release, since the other engine can't run it. The next deploy builds it for the new runtime.
+Switching an app between Native Process and Docker in the **Build** card stops the app and drops its current release, since the other engine can't run it. The next deploy builds it for the new runtime.

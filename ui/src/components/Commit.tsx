@@ -7,7 +7,7 @@ export function Commit({ gitUrl, sha, message }: { gitUrl: string; sha: string; 
   const url = commitURL(gitUrl, sha);
   const code = <Code>{sha.slice(0, 7)}</Code>;
   return (
-    <Tooltip label={message || sha} disabled={!message && !url}>
+    <Tooltip label={message || sha} disabled={!message && !url} multiline maw={480} style={{ whiteSpace: 'pre-wrap' }}>
       {url ? (
         <Anchor href={url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
           {code}

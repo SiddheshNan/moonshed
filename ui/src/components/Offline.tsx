@@ -46,7 +46,7 @@ export function Unreachable() {
           <Loader size="sm" />
           <Text fw={600}>Can't reach Moonshed</Text>
           <Text size="sm" c="dimmed" ta="center">
-            Check that it's running. This page reconnects on its own.
+            Please Check that it's running.
           </Text>
         </Stack>
       </Paper>

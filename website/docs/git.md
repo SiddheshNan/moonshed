@@ -4,13 +4,14 @@ An app's source is either a zip upload or a git repository. You choose it when y
 
 For git sources you set the branch and, optionally, a **Folder** if the app lives in a subfolder of the repository. Every git deploy is zipped into a bundle, so redeploying an older version never needs the repository.
 
-## GitHub
+## GitHub App
 
 The easiest way to deploy from GitHub is to connect a GitHub App. Clones then use short-lived tokens, so private repositories need no personal token, and you get a repository and branch picker.
 
-1. Go to **Settings › Git** and click **Connect GitHub**. Fill in an organization if the app should belong to one.
-2. GitHub creates a private GitHub App for your Moonshed. Install it on the accounts or repositories you want to deploy.
-3. When creating an app, choose **GitHub** under **Deploy from** and pick the repository and branch.
+1. Go to **Settings › Git**, choose who should own the GitHub App (your personal account or an organization you own) and click **Continue on GitHub**.
+2. GitHub opens with the app's settings filled in. Click **Create GitHub App**.
+3. Install it on the accounts you want to deploy from and choose which repositories Moonshed may read. Use **Install on another account** later to add more.
+4. When creating an app, choose **GitHub App** under **Deploy from** and pick the repository and branch.
 
 All pushes arrive at one webhook, `POST /api/hooks/github`, signed with the GitHub App's secret.
 
@@ -22,7 +23,7 @@ GitHub has to reach your panel over HTTPS to send webhooks. Give the panel a dom
 
 For GitLab, Bitbucket, Gitea or anything else, choose **Git URL** and paste the repository URL. Public repositories need nothing else.
 
-For private repositories, add an access token under **Settings › Git › Access tokens** and pick it on the app. Tokens are saved once, stored encrypted, and can be shared between apps.
+For private repositories, add a **git login** under **Settings › Git**: your username and a personal access token from that host. Then pick it as the app's **Git login**. One login can be used by many apps.
 
 ## Deploying on push
 

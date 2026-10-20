@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react';
 import { AreaChart } from '@mantine/charts';
 import { Card, Group, Progress, SegmentedControl, Stack, Text, Tooltip } from '@mantine/core';
+import { IconInfoCircle } from '@tabler/icons-react';
 
 import { formatDateTime, timeAgo } from '../format';
 import type { Point, Series } from '../types';
@@ -11,6 +13,14 @@ export function RangePicker({ value, onChange }: { value: string; onChange: (v: 
 }
 
 type ChartSeries = { key: string; label: string; color: string };
+
+// bucketSize is how much time one chart point covers for a range, matching the metric tiers in DESIGN.md.
+function bucketSize(range: string): string {
+  if (['1m', '5m', '15m'].includes(range)) return '5 seconds';
+  if (['24h', '48h'].includes(range)) return '5 minutes';
+  if (range === '7d') return '30 minutes';
+  return '1 minute';
+}
 
 function timeLabel(t: number, range: string): string {
   const d = new Date(t * 1000);
@@ -52,7 +62,7 @@ export function MetricChart({
   format: (v: number) => string;
   range: string;
   peak?: boolean;
-  value?: string;
+  value?: ReactNode;
   detail?: string;
   axisFormat?: (v: number) => string;
 }) {
@@ -60,20 +70,35 @@ export function MetricChart({
   const lines = keys.map((k) => ({ name: k.key, label: k.label, color: k.color }));
   if (peak) {
     for (const k of keys) {
-      lines.push({ name: `${k.key}_max`, label: `${k.label} peak`, color: k.color, strokeDasharray: '4 4' } as (typeof lines)[number]);
+      lines.push({ name: `${k.key}_max`, label: `${k.label} (highest)`, color: k.color, strokeDasharray: '4 4' } as (typeof lines)[number]);
     }
+    for (const l of lines.slice(0, keys.length)) l.label = `${l.label} (average)`;
   }
+  const heading = (
+    <Group gap={4} wrap="nowrap">
+      <span>{title}</span>
+      {peak && (
+        <Tooltip
+          multiline
+          w={280}
+          label={`Each point covers ${bucketSize(range)}. The solid line is the average over that time, the dashed line the highest reading in it, so short spikes still show.`}
+        >
+          <IconInfoCircle size={14} style={{ flexShrink: 0, cursor: 'help' }} />
+        </Tooltip>
+      )}
+    </Group>
+  );
   return (
     <Card padding="lg">
       {value === undefined ? (
-        <Text size="sm" fw={600} mb="md">
-          {title}
+        <Text size="sm" fw={600} mb="md" component="div">
+          {heading}
         </Text>
       ) : (
         <Group justify="space-between" align="flex-start" mb="md" wrap="nowrap">
           <div>
-            <Text size="xs" c="dimmed" fw={500}>
-              {title}
+            <Text size="xs" c="dimmed" fw={500} component="div">
+              {heading}
             </Text>
             <Text className="stat-value" fz={20} fw={600} mt={2} lh={1.25}>
               {value}

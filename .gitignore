@@ -7,6 +7,8 @@ ui/dist/
 # The dev runtime: only its config is committed, the rest is created on first run.
 /runtime/*
 !/runtime/config/
+backend/runtime/*
+!/backend/runtime/config/
 website/node_modules/
 website/.vitepress/cache/
 website/.vitepress/dist/

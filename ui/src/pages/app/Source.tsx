@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button, Code, CopyButton, Group, Progress, SegmentedControl, Stack, Text } from '@mantine/core';
 import { Dropzone } from '@mantine/dropzone';
+import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { IconFileZip, IconUpload, IconX } from '@tabler/icons-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -8,6 +9,7 @@ import { useNavigate } from 'react-router';
 
 import { api, queryClient, uploadBundle } from '../../api';
 import { emptyGitSource, gitSourceFields, GitSourceFields, gitSourceFromApp, gitSourceReady, type GitSourceValue } from '../../components/GitSource';
+import { formatBytes } from '../../format';
 import { appPath } from '../../paths';
 import type { App, SettingsResponse } from '../../types';
 import { Section, useSave } from './Settings';
@@ -47,7 +49,7 @@ export function Source({ app }: { app: App }) {
         onChange={(v) => pick(v as SourceChoice)}
         data={[
           { value: 'upload', label: 'Zip upload' },
-          { value: 'github', label: 'GitHub' },
+          { value: 'github', label: 'GitHub App' },
           { value: 'git', label: 'Git URL' },
         ]}
       />
@@ -110,6 +112,7 @@ export function CopyField({ label, value }: { label?: string; value: string }) {
 export function UploadBundle({ app }: { app: App }) {
   const navigate = useNavigate();
   const [progress, setProgress] = useState<number | null>(null);
+  const [file, setFile] = useState<File | null>(null);
 
   const upload = async (file: File) => {
     setProgress(0);
@@ -121,6 +124,7 @@ export function UploadBundle({ app }: { app: App }) {
       notifications.show({ color: 'red', title: 'Upload failed', message: (err as Error).message });
     } finally {
       setProgress(null);
+      setFile(null);
     }
   };
 
@@ -131,8 +135,30 @@ export function UploadBundle({ app }: { app: App }) {
           <Text size="sm">Uploading… {progress}%</Text>
           <Progress value={progress} animated />
         </Stack>
+      ) : file ? (
+        <Group justify="space-between" wrap="nowrap" p="md" style={{ border: '1px solid var(--app-border)', borderRadius: 8 }}>
+          <Group gap="sm" wrap="nowrap" miw={0}>
+            <IconFileZip size={28} stroke={1.5} color="var(--mantine-color-dimmed)" />
+            <div style={{ minWidth: 0 }}>
+              <Text size="sm" fw={500} truncate>
+                {file.name}
+              </Text>
+              <Text size="xs" c="dimmed">
+                {formatBytes(file.size)}
+              </Text>
+            </div>
+          </Group>
+          <Group gap="xs" wrap="nowrap">
+            <Button variant="default" onClick={() => setFile(null)}>
+              Remove
+            </Button>
+            <Button leftSection={<IconUpload size={16} />} onClick={() => upload(file)}>
+              Deploy
+            </Button>
+          </Group>
+        </Group>
       ) : (
-        <Dropzone onDrop={(files) => upload(files[0])} accept={['application/zip', 'application/x-zip-compressed']} multiple={false} maxSize={4 * 1024 ** 3}>
+        <Dropzone onDrop={(files) => setFile(files[0])} accept={['application/zip', 'application/x-zip-compressed']} multiple={false} maxSize={4 * 1024 ** 3}>
           <Group justify="center" gap="md" mih={88} style={{ pointerEvents: 'none' }}>
             <Dropzone.Accept>
               <IconUpload size={28} stroke={1.5} />
@@ -178,14 +204,30 @@ function CIDeploy({ app }: { app: App }) {
           Deploy from CI
         </Text>
         {!token && (
-          <Button size="compact-sm" variant="default" loading={create.isPending} onClick={() => create.mutate()}>
+          <Button
+            size="compact-sm"
+            variant="default"
+            loading={create.isPending}
+            onClick={() =>
+              modals.openConfirmModal({
+                title: 'Create an API token?',
+                children: (
+                  <Text size="sm">
+                    This creates a new token <b>ci-{app.name}</b> for your CI. You'll see it only once, so copy it right away.
+                  </Text>
+                ),
+                labels: { confirm: 'Create token', cancel: 'Cancel' },
+                onConfirm: () => create.mutate(),
+              })
+            }
+          >
             Create token
           </Button>
         )}
       </Group>
       {token && (
         <Text size="xs" c="orange">
-          Copy it now. The token won't be shown again; manage tokens in Settings › API tokens.
+          Copy it now. The token won't be shown again; You can manage tokens in Settings › API tokens.
         </Text>
       )}
       <CopyField value={curl} />

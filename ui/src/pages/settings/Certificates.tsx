@@ -27,7 +27,7 @@ export function CertificatesPage() {
   const s = settings.data;
   if (s?.settings.panel_domain && s.settings.panel_tls !== 'none') {
     const { panel_domain: host, panel_tls: tls } = s.settings;
-    rows.set(host, { host, tls, usedBy: [{ label: 'Panel', to: '/settings' }], cert: s.panel_certificate ?? null });
+    rows.set(host, { host, tls, usedBy: [{ label: 'Panel', to: '/settings/proxy' }], cert: s.panel_certificate ?? null });
   }
   const list = [...rows.values()].sort((a, b) => a.host.localeCompare(b.host));
 

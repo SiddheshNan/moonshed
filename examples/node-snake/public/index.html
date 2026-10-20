@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Snake</title>
+  <style>
+    :root {
+      --bg: #fafafa; --card: #fff; --text: #18181b; --muted: #71717a; --border: #e4e4e7;
+      --board: #f4f4f5; --snake: #4f46e5; --head: #3730a3; --food: #16a34a; --accent: #4f46e5;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #09090b; --card: #18181b; --text: #fafafa; --muted: #a1a1aa; --border: #27272a;
+              --board: #111113; --snake: #818cf8; --head: #c7d2fe; --food: #4ade80; --accent: #6366f1; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    main { max-width: 760px; margin: 40px auto; padding: 0 16px; display: grid; grid-template-columns: minmax(0, 420px) 1fr; gap: 24px; }
+    @media (max-width: 680px) { main { grid-template-columns: 1fr; } }
+    h1 { margin: 0 0 4px; font-size: 28px; }
+    .sub { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+    .stats { display: flex; justify-content: space-between; margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+    .board { position: relative; }
+    canvas { display: block; width: 100%; aspect-ratio: 1; background: var(--board); border: 1px solid var(--border); border-radius: 10px; touch-action: none; }
+    .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 16px; background: color-mix(in srgb, var(--bg) 82%, transparent); border-radius: 10px; }
+    .overlay[hidden] { display: none; }
+    .overlay h2 { margin: 0; font-size: 22px; }
+    .overlay form { display: flex; gap: 8px; }
+    input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text); font: inherit; width: 160px; }
+    button { padding: 8px 16px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+    .hint { color: var(--muted); font-size: 13px; }
+    aside { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; align-self: start; }
+    aside h2 { margin: 0 0 8px; font-size: 16px; }
+    ol { margin: 0; padding-left: 24px; font-variant-numeric: tabular-nums; }
+    ol li { display: flex; justify-content: space-between; gap: 8px; }
+    ol li::marker { color: var(--muted); }
+    ol li.hint { list-style: none; margin-left: -24px; }
+    .note { margin: 12px 0 0; color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>Snake</h1>
+    <p class="sub" id="info">Arrow keys or WASD to move, space to pause. Swipe on a phone.</p>
+    <div class="stats"><span>Score <b id="score">0</b></span><span>Best <b id="best">0</b></span></div>
+    <div class="board">
+      <canvas id="canvas" width="400" height="400"></canvas>
+      <div class="overlay" id="overlay">
+        <h2 id="title">Snake</h2>
+        <p class="hint" id="message">Eat the green squares. Don't hit the walls or yourself.</p>
+        <form id="submit" hidden>
+          <input id="name" placeholder="Your name" maxlength="16" autocomplete="nickname">
+          <button type="submit">Save score</button>
+        </form>
+        <button id="start" type="button">Play</button>
+      </div>
+    </div>
+  </section>
+  <aside>
+    <h2>Leaderboard</h2>
+    <ol id="scores"></ol>
+    <p class="note">Kept in memory by the server, so it resets on every deploy or restart.</p>
+  </aside>
+</main>
+<script>
+  const SIZE = 20, CELL = 20, START_SPEED = 130, MIN_SPEED = 60;
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const $ = id => document.getElementById(id);
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  let snake, dir, nextDir, food, score, timer, paused, running = false;
+  let best = 0;
+  try { best = Number(localStorage.getItem('snake-best')) || 0; } catch {}
+  $('best').textContent = best;
+
+  function reset() {
+    snake = [{ x: 9, y: 10 }, { x: 8, y: 10 }, { x: 7, y: 10 }];
+    dir = nextDir = { x: 1, y: 0 };
+    score = 0;
+    paused = false;
+    $('score').textContent = 0;
+    placeFood();
+  }
+
+  function placeFood() {
+    const free = [];
+    for (let x = 0; x < SIZE; x++)
+      for (let y = 0; y < SIZE; y++)
+        if (!snake.some(s => s.x === x && s.y === y)) free.push({ x, y });
+    food = free[Math.floor(Math.random() * free.length)];
+  }
+
+  function speed() { return Math.max(MIN_SPEED, START_SPEED - score / 10 * 3); }
+
+  function tick() {
+    dir = nextDir;
+    const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+    const ate = food && head.x === food.x && head.y === food.y;
+    // The tail moves out of the way this tick unless the snake grows.
+    const body = ate ? snake : snake.slice(0, -1);
+    if (head.x < 0 || head.y < 0 || head.x >= SIZE || head.y >= SIZE || body.some(s => s.x === head.x && s.y === head.y)) {
+      return gameOver();
+    }
+    snake.unshift(head);
+    if (ate) {
+      score += 10;
+      $('score').textContent = score;
+      placeFood();
+      if (!food) return gameOver(true);
+    } else {
+      snake.pop();
+    }
+    draw();
+    timer = setTimeout(tick, speed());
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (food) {
+      ctx.fillStyle = css('--food');
+      ctx.beginPath();
+      ctx.roundRect(food.x * CELL + 3, food.y * CELL + 3, CELL - 6, CELL - 6, 4);
+      ctx.fill();
+    }
+    snake.forEach((s, i) => {
+      ctx.fillStyle = i === 0 ? css('--head') : css('--snake');
+      ctx.beginPath();
+      ctx.roundRect(s.x * CELL + 1, s.y * CELL + 1, CELL - 2, CELL - 2, 5);
+      ctx.fill();
+    });
+  }
+
+  function start() {
+    reset();
+    running = true;
+    $('overlay').hidden = true;
+    draw();
+    timer = setTimeout(tick, speed());
+  }
+
+  function gameOver(won = false) {
+    running = false;
+    clearTimeout(timer);
+    if (score > best) {
+      best = score;
+      $('best').textContent = best;
+      try { localStorage.setItem('snake-best', best); } catch {}
+    }
+    $('title').textContent = won ? 'You filled the board!' : 'Game over';
+    $('message').textContent = `You scored ${score}.`;
+    $('submit').hidden = score === 0;
+    $('start').textContent = 'Play again';
+    $('overlay').hidden = false;
+    if (score > 0) $('name').focus();
+  }
+
+  function togglePause() {
+    if (!running) return;
+    paused = !paused;
+    if (paused) {
+      clearTimeout(timer);
+      $('title').textContent = 'Paused';
+      $('message').textContent = 'Press space to keep going.';
+      $('submit').hidden = true;
+      $('start').hidden = true;
+      $('overlay').hidden = false;
+    } else {
+      $('overlay').hidden = true;
+      $('start').hidden = false;
+      timer = setTimeout(tick, speed());
+    }
+  }
+
+  function turn(x, y) {
+    // Can't reverse straight into the snake's own neck.
+    if (running && !paused && (x !== -dir.x || y !== -dir.y)) nextDir = { x, y };
+  }
+
+  const KEYS = {
+    ArrowUp: [0, -1], w: [0, -1], ArrowDown: [0, 1], s: [0, 1],
+    ArrowLeft: [-1, 0], a: [-1, 0], ArrowRight: [1, 0], d: [1, 0],
+  };
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.key === ' ') { e.preventDefault(); running ? togglePause() : start(); return; }
+    const k = KEYS[e.key] || KEYS[e.key.toLowerCase()];
+    if (k) { e.preventDefault(); turn(...k); }
+  });
+
+  let touch = null;
+  canvas.addEventListener('touchstart', e => { touch = e.touches[0]; }, { passive: true });
+  canvas.addEventListener('touchend', e => {
+    if (!touch) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touch.clientX, dy = t.clientY - touch.clientY;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) > 20) {
+      Math.abs(dx) > Math.abs(dy) ? turn(Math.sign(dx), 0) : turn(0, Math.sign(dy));
+    }
+    touch = null;
+  });
+
+  $('start').onclick = start;
+
+  $('submit').onsubmit = async e => {
+    e.preventDefault();
+    const name = $('name').value.trim();
+    if (!name) return $('name').focus();
+    const res = await fetch('/api/scores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, score }),
+    });
+    if (res.ok) {
+      renderScores(await res.json());
+      $('submit').hidden = true;
+      $('message').textContent = `Saved ${score} for ${name}.`;
+    } else {
+      $('message').textContent = (await res.json().catch(() => ({}))).error || 'Could not save the score.';
+    }
+  };
+
+  function renderScores(list) {
+    const ol = $('scores');
+    ol.replaceChildren();
+    if (list.length === 0) {
+      const li = document.createElement('li');
+      li.className = 'hint';
+      li.textContent = 'No scores yet.';
+      ol.append(li);
+    }
+    for (const s of list) {
+      const li = document.createElement('li');
+      const name = document.createElement('span');
+      name.textContent = s.name;
+      const pts = document.createElement('b');
+      pts.textContent = s.score;
+      li.append(name, pts);
+      ol.append(li);
+    }
+  }
+
+  fetch('/api/scores').then(r => r.json()).then(renderScores).catch(() => {});
+  fetch('/api/info').then(r => r.json()).then(i => {
+    $('info').textContent += ` App ${i.app}, release ${i.release.slice(0, 8)}.`;
+  }).catch(() => {});
+
+  reset();
+  draw();
+</script>
+</body>
+</html>

@@ -5,7 +5,7 @@
 ## Full example
 
 ```yaml
-pre: |                  # native: runs on every deploy, before start
+pre: |                  # Native Process: runs on every deploy, before start
   python -m venv .venv
   .venv/bin/pip install -r requirements.txt
 run: .venv/bin/gunicorn app:app --bind 0.0.0.0:$PORT
@@ -46,15 +46,15 @@ Every setting here can also be changed in the app's UI. **A value set in the UI 
 
 ### `pre`
 
-Script run on every deploy in the new release folder, before the app starts. If it fails, the deploy stops and the old version keeps running. Native apps only.
+Script run on every deploy in the new release folder, before the app starts. If it fails, the deploy stops and the old version keeps running. Native Process apps only.
 
 ### `run`
 
-Starts the app. It must stay in the foreground. Having a `run` command makes the app native, even if there is also a Dockerfile.
+Starts the app. It must stay in the foreground. Having a `run` command makes the app a Native Process, even if there is also a Dockerfile.
 
 ### `post`
 
-Script run after the new version is healthy. A failure is logged as a warning and nothing is rolled back. Native apps only.
+Script run after the new version is healthy. A failure is logged as a warning and nothing is rolled back. Native Process apps only.
 
 ### Script formats
 
@@ -123,6 +123,6 @@ Every script and container gets the app's env vars plus:
 | `PORT` | The app's port, when it has one |
 | `APP_NAME` | The app's name |
 | `RELEASE_ID` | The ID of the release being run |
-| `APP_DIR` | The current release folder. Native apps only. |
-| `SHARED_DIR` | The persistent folder that survives deploys. Native apps only. |
-| `CACHE_DIR` | A persistent cache folder, e.g. `pip --cache-dir $CACHE_DIR`. Native apps only. |
+| `APP_DIR` | The current release folder. Native Process apps only. |
+| `SHARED_DIR` | The persistent folder that survives deploys. Native Process apps only. |
+| `CACHE_DIR` | A persistent cache folder, e.g. `pip --cache-dir $CACHE_DIR`. Native Process apps only. |

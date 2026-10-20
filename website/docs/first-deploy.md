@@ -1,6 +1,6 @@
 # Deploy your first app
 
-This walks through deploying a small Flask app as a native process. The same app is in the repository at [`examples/python-app`](https://github.com/SiddheshNan/moonshed/tree/main/examples/python-app).
+This walks through deploying a small Flask app as a Native Process. The same app is in the repository at [`examples/flask-hello`](https://github.com/SiddheshNan/moonshed/tree/main/examples/flask-hello).
 
 ## 1. Describe the app
 
@@ -29,7 +29,7 @@ health:
 The app reads its port from the environment:
 
 ```python
-app.run(host="0.0.0.0", port=int(os.environ["PORT"]))
+serve(app, host="0.0.0.0", port=int(os.environ["PORT"]))  # waitress
 ```
 
 Every key is optional, and anything you set here can also be set in the UI. See the [moonshed.yaml reference](/docs/reference/moonshed-yaml) for all of them.
@@ -43,12 +43,12 @@ If the app has a `Dockerfile` and no `run` command, Moonshed builds and runs it 
 In the panel, click **New app**, give it a name (lowercase letters, digits and dashes) and pick or create a project. Under **Deploy from**, choose:
 
 - **Zip upload** to upload the code yourself,
-- **GitHub** to pick a repository through the GitHub App (see [Git and webhooks](/docs/git)), or
+- **GitHub App** to pick a repository from GitHub (see [Git and webhooks](/docs/git)), or
 - **Git URL** for any other git host.
 
 ## 3. Deploy
 
-Click **Deploy**. For a zip app, drop the zip of your app folder into the dialog. For a git app, Moonshed clones the branch.
+Click **Deploy**. For a zip app, choose the zip of your app folder and click **Deploy** again. For a git app, Moonshed clones the branch.
 
 The deployment shows up on the **Deployments** tab with a live log. Moonshed:
 

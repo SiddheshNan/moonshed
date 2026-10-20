@@ -31,7 +31,7 @@ export function Section({
   saveHint,
 }: {
   title: string;
-  description?: string;
+  description?: ReactNode;
   children: ReactNode;
   onSave?: () => void;
   saving?: boolean;
@@ -94,6 +94,7 @@ function RunAs({ app }: { app: App }) {
       <SimpleGrid cols={{ base: 1, sm: 2 }}>
         <TextInput
           label="Username"
+          description={windows ? 'Windows username' : 'Linux user'}
           placeholder={windows ? 'DOMAIN\\user' : 'Empty = service account'}
           value={user}
           onChange={(e) => setUser(e.currentTarget.value)}

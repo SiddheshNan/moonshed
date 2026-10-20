@@ -15,7 +15,7 @@ import { ProjectsPage } from './pages/Projects';
 import { RequestsPage } from './pages/RequestsPage';
 import { AuditPage } from './pages/settings/Audit';
 import { CertificatesPage } from './pages/settings/Certificates';
-import { GeneralSettingsPage } from './pages/settings/General';
+import { BackupsSettingsPage } from './pages/settings/Backups';
 import { GitSettingsPage } from './pages/settings/Git';
 import { ProxySettingsPage } from './pages/settings/Proxy';
 import { TokensPage } from './pages/settings/Tokens';
@@ -55,13 +55,14 @@ export function App() {
         <Route path="/apps" element={<AppsPage />} />
         <Route path="/deployments" element={<DeploymentsPage />} />
         <Route path="/requests" element={<RequestsPage />} />
-        <Route path="/settings" element={<GeneralSettingsPage />} />
+        <Route path="/settings" element={<Navigate to="/settings/proxy" replace />} />
         <Route path="/settings/proxy" element={<ProxySettingsPage />} />
         <Route path="/settings/git" element={<GitSettingsPage />} />
         <Route path="/settings/certificates" element={<CertificatesPage />} />
         <Route path="/settings/users" element={<UsersPage />} />
         <Route path="/settings/tokens" element={<TokensPage />} />
         <Route path="/settings/audit" element={<AuditPage />} />
+        <Route path="/settings/backups" element={<BackupsSettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

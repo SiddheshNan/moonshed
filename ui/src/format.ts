@@ -63,7 +63,7 @@ const triggerLabels: Record<string, string> = {
   upload: 'Zip upload',
   api: 'API token',
   manual: 'Manual',
-  github_app: 'GitHub push',
+  github_app: 'GitHub App push',
   github_webhook: 'GitHub webhook',
   gitlab_webhook: 'GitLab webhook',
   deploy_hook: 'Deploy hook',
@@ -78,7 +78,7 @@ export function triggerLabel(trigger: string): string {
 
 // runtimeLabel names an app's runtime, or '' before it's detected.
 export function runtimeLabel(runtime: string): string {
-  return runtime === 'docker' ? 'Docker' : runtime === 'native' ? 'Native' : '';
+  return runtime === 'docker' ? 'Docker' : runtime === 'native' ? 'Native Process' : '';
 }
 
 // sourceLabel says where an app's versions come from: owner/repo for git, else zip upload.

@@ -1,0 +1,14 @@
+pre:
+  linux: npm install --omit=dev --no-audit --no-fund --cache "$CACHE_DIR/npm"
+  windows: npm install --omit=dev --no-audit --no-fund --cache "$env:CACHE_DIR\npm"
+
+run: node server.js
+
+port: 3000
+
+health:
+  http: /healthz
+  interval: 30s
+  timeout: 5s
+  failures: 3
+restart_unhealthy: true

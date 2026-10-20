@@ -1,0 +1,23 @@
+pre:
+  linux: |
+    python3 -m venv .venv
+    .venv/bin/pip install --cache-dir "$CACHE_DIR/pip" -r requirements.txt
+  windows: |
+    python -m venv .venv
+    .venv\Scripts\pip install --cache-dir "$env:CACHE_DIR\pip" -r requirements.txt
+
+run:
+  linux: .venv/bin/python main.py
+  windows: .venv\Scripts\python main.py
+
+port: 8001
+
+# The SQLite database lives here, so todos survive deploys and rollbacks.
+persist:
+  - data/
+
+health:
+  http: /healthz
+  interval: 30s
+  timeout: 5s
+  failures: 3

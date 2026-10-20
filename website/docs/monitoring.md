@@ -58,7 +58,7 @@ Samples are rolled up in memory and only the rollups are stored, so storage stay
 | 5 minutes | 48 hours | 24h, 48h |
 | 30 minutes | 7 days | 7d |
 
-Charts draw the average for each point, with the peak as a dashed line.
+Charts show the average for each point. CPU and app memory charts also show the highest reading as a dashed line, so short spikes don't get lost on long ranges.
 
 ## Request log
 

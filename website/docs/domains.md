@@ -4,7 +4,7 @@ Moonshed has a reverse proxy built in: an embedded Caddy server. You never edit 
 
 ## Turn on the proxy
 
-The proxy is off until you enable it in **Settings › Proxy**. While it's off, apps are only reachable directly on their port.
+The proxy is off until you enable it in **Settings › Reverse Proxy (Caddy)**. While it's off, apps are only reachable directly on their port.
 
 When it's on, it listens on `http_addr` and `https_addr` from the [configuration file](/docs/reference/configuration), `:80` and `:443` by default. Set a **Let's Encrypt email** there if you want expiry notices from Let's Encrypt.
 
@@ -43,7 +43,7 @@ For anything else, the domain's **Advanced** tab takes raw Caddyfile directives 
 
 ## Global proxy settings
 
-**Settings › Proxy** also has:
+**Settings › Reverse Proxy (Caddy)** also has:
 
 - **Trusted proxies**, for when Moonshed sits behind a load balancer or Cloudflare, so client IPs are read from the forwarded headers.
 - **Global options** and **Extra sites** as raw Caddyfile, for things Moonshed doesn't cover.
@@ -59,6 +59,6 @@ An unchanged config isn't reloaded, since a reload drops idle keep-alive connect
 
 The panel is always served on `panel_addr` (`:5050` by default) over plain HTTP, even when the proxy is off or misconfigured, so you can't lock yourself out.
 
-To reach the panel over HTTPS, set a **Panel domain** in **Settings › General** with Let's Encrypt, a custom certificate or plain HTTP. Both ways keep working.
+To reach the panel over HTTPS, set a **Panel domain** in **Settings › Reverse Proxy (Caddy) › Panel access** with Let's Encrypt, a custom certificate or plain HTTP. Both ways keep working.
 
 Once the panel has a domain, consider setting `panel_addr: "127.0.0.1:5050"` so port 5050 isn't exposed to the network.
