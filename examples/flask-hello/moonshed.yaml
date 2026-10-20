@@ -10,6 +10,8 @@ run:
   linux: .venv/bin/python app.py
   windows: .venv\Scripts\python app.py
 
+port: 8000
+
 persist:
   - data/
 

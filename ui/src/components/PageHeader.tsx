@@ -35,13 +35,13 @@ export function PageHeader({
         </Breadcrumbs>
       )}
       <Group justify="space-between" align="flex-start" wrap="wrap" gap="sm">
-        <div>
+        <div style={{ minWidth: 0, maxWidth: '100%' }}>
           <Group gap="sm">
             <Title order={2}>{title}</Title>
             {badges}
           </Group>
           {description && (
-            <Text size="sm" c="dimmed" mt={4}>
+            <Text size="sm" c="dimmed" mt={4} truncate>
               {description}
             </Text>
           )}

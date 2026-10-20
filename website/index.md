@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Moonshed
   text: A small, self-hosted platform (PaaS) for deploying your apps.
-  tagline: One Go binary and SQLite. Runs on Linux and Windows, comfortably on 1 core and 1 GB of RAM.
+  tagline: One binary and SQLite. Runs on Linux and Windows, comfortably on 1 core and 1 GB of RAM.
   image:
     src: /logo.svg
     alt: Moonshed
@@ -22,7 +22,7 @@ hero:
 features:
   - title: One binary, one database
     details: No Postgres, Redis or Traefik. The reverse proxy is built in and Docker is optional.
-  - title: Native or Docker, per app
+  - title: Native Process or Docker, per app
     details: Run an app as a supervised process, like pm2, or as a container built with BuildKit.
   - title: Safe rollouts
     details: A new version has to pass its health check before it replaces the old one. Any kept version can be redeployed.

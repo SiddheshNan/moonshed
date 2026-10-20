@@ -2,7 +2,7 @@
 
 <h1 align="center">Moonshed</h1>
 
-<p align="center">A small, self-hosted platform (PaaS) for deploying your apps.<br>One Go binary and SQLite. Runs on Linux and Windows.</p>
+<p align="center">A small, self-hosted platform (PaaS) for deploying your apps.<br>One binary and SQLite. Runs on Linux and Windows.</p>
 
 <p align="center">
   <a href="https://moonshed.siddhesh.me">Website</a> ·
@@ -22,7 +22,7 @@ Platforms like Dokploy and Coolify are great, but they bring a stack with them: 
 - **One binary, one SQLite file.** The reverse proxy (Caddy) is built in. Nothing else to install or keep running.
 - **Light.** Comfortable on 1 core and 1 GB of RAM. The platform itself used about 15 MB of memory running three apps.
 - **Docker is optional.** Run an app as a plain process that Moonshed supervises (like how pm2 does), or as a container. You choose per app.
-- **Linux and Windows.** Runs as a systemd unit or a Windows service, and native apps run on either.
+- **Linux and Windows.** Runs as a systemd unit or a Windows service, and Native Process apps run on either.
 - **Config in the repo or the UI.** A `moonshed.yaml` next to your code, the same settings in the panel, or just a Dockerfile.
 
 
@@ -38,7 +38,7 @@ Platforms like Dokploy and Coolify are great, but they bring a stack with them: 
 **Run**
 - Built-in reverse proxy (Caddy) with domains, path routing and automatic HTTPS (Let's Encrypt), or your own certificate.
 - Per-domain options: HTTPS redirect, HSTS, compression, basic auth, IP allow lists, headers, body size limits, and raw Caddyfile for the rest.
-- Encrypted env vars, persistent data folders that survive deploys, and per-app OS users for native apps.
+- Encrypted env vars, persistent data folders that survive deploys, and per-app OS users for Native Process apps.
 - Live logs for every app and every deployment.
 
 **Watch**
@@ -96,7 +96,7 @@ curl -fsS -H "Authorization: Bearer $MOONSHED_TOKEN" -H "Content-Type: applicati
   --data-binary @app.zip https://panel.example.com/api/apps/$APP_ID/deploy
 ```
 
-[examples/python-app](examples/python-app) is a working example, and the [moonshed.yaml reference](https://moonshed.siddhesh.me/docs/reference/moonshed-yaml) lists every key.
+[examples/](examples) has working apps to try: a [Flask hello world](examples/flask-hello), a [FastAPI todo list](examples/fastapi-todo) backed by SQLite, and a [Snake game](examples/node-snake) on Node and Express. The [moonshed.yaml reference](https://moonshed.siddhesh.me/docs/reference/moonshed-yaml) lists every key.
 
 ## Good to know
 
@@ -105,7 +105,7 @@ Moonshed keeps things simple on purpose. Today it:
 - runs on **one server**; there is no multi-server mode yet,
 - has a **short gap during a deploy** while the old version stops and the new one starts,
 - has **no resource limits** per app yet,
-- doesn't sandbox native apps; give an app its own OS user to limit what it can touch.
+- doesn't sandbox Native Process apps; give an app its own OS user to limit what it can touch.
 
 These are on the list for later versions.
 

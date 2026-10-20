@@ -1,8 +1,8 @@
-# Native apps
+# Native Process apps
 
-A native app runs as a plain process that Moonshed starts and supervises, much like pm2. There is no container, so it uses whatever runtime is installed on the server (Python, Node, a compiled binary and so on).
+A Native Process app runs as a plain process that Moonshed starts and supervises, much like pm2. There is no container, so it uses whatever runtime is installed on the server (Python, Node, a compiled binary and so on).
 
-An app runs natively when it has a `run` command, from `moonshed.yaml` or the **Build** card on Overview, even if it also has a Dockerfile.
+An app runs as a Native Process when it has a `run` command, from `moonshed.yaml` or the **Build** card on Overview, even if it also has a Dockerfile.
 
 ## Scripts
 
@@ -81,7 +81,7 @@ These paths live in the app's `shared/` folder and are linked into every release
 - **Stopping** is graceful first, then forced after 10 seconds. On Linux that is SIGTERM then SIGKILL to the process group; on Windows it is CTRL_BREAK, then the Job Object is terminated. Either way every child process is stopped too.
 - **Logs** are captured from stdout and stderr and written to daily files. You see them live on the **Logs** tab.
 
-When Moonshed itself restarts, for an upgrade for example, it stops its native apps and starts them again.
+When Moonshed itself restarts, for an upgrade for example, it stops its Native Process apps and starts them again.
 
 ## Running as another OS user
 
@@ -93,5 +93,5 @@ By default apps run as the same account as Moonshed: root on Linux, LocalSystem 
 - **Windows:** enter the user's password too. It is stored encrypted. Moonshed logs the user on and loads their profile, so `%APPDATA%` and `%USERPROFILE%` work.
 
 ::: warning
-Native apps are not sandboxed. Without a separate user, an app can read anything Moonshed can.
+Native Process apps are not sandboxed. Without a separate user, an app can read anything Moonshed can.
 :::

@@ -49,7 +49,7 @@ A downloaded backup that includes env vars has them in plain text in `.env`.
 
 ## Platform backups
 
-Moonshed backs up its own database too, with the key that decrypts its secrets. Make one or set a schedule under **Settings › General › Platform backups**.
+Moonshed backs up its own database too, with the key that decrypts its secrets. Make one or set a schedule under **Settings › Backups**.
 
 To restore, stop Moonshed and extract the archive into `runtime/data/`.
 

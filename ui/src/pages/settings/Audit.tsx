@@ -92,7 +92,7 @@ export function AuditPage() {
 
   return (
     <Stack gap="lg">
-      <PageHeader crumbs={[{ label: 'Settings' }]} title="Audit log" description="Kept for one year." />
+      <PageHeader crumbs={[{ label: 'Settings' }]} title="Audit log" />
       <Group>
         <Select placeholder="Everything" data={areas} value={action} onChange={setAction} clearable w={200} />
         <TextInput placeholder="Username" leftSection={<IconSearch size={16} />} value={actor} onChange={(e) => setActor(e.currentTarget.value.trim())} w={220} />

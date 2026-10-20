@@ -101,7 +101,7 @@ export function GitSourceFields({
       label="Deploy automatically on every push"
       description={
         value.provider === 'git' && value.autodeploy && !webhookShown
-          ? 'This will need a webhook setup on your repository. Please save to proceed.'
+          ? 'Needs a webhook on the repository. Its URL shows up once the app is saved.'
           : undefined
       }
       checked={value.autodeploy}
@@ -113,9 +113,9 @@ export function GitSourceFields({
     if (git.data && installs.length === 0) {
       return (
         <Text size="sm" c="dimmed">
-          GitHub isn't connected yet.{' '}
+          No GitHub App is connected yet.{' '}
           <Anchor component={Link} to="/settings/git" size="sm">
-            Connect GitHub
+            Connect a GitHub App
           </Anchor>{' '}
           first, or use a Git URL.
         </Text>
@@ -171,11 +171,12 @@ export function GitSourceFields({
         onChange={(e) => set({ gitURL: e.currentTarget.value })}
       />
       <Select
-        label="Access token"
+        label="Git login"
+        description="Needed only for private repositories"
         data={[
           { value: '', label: 'None (public repository)' },
           ...(git.data?.credentials ?? []).map((c) => ({ value: c.id, label: `${c.name} · ${c.host}` })),
-          { value: addToken, label: 'Add token…' },
+          { value: addToken, label: 'Add git login…' },
         ]}
         value={value.credential}
         onChange={(v) => (v === addToken ? setAdding(true) : set({ credential: v ?? '' }))}

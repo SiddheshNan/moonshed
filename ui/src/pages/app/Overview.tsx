@@ -134,7 +134,7 @@ function Facts({ app, deployed, onEditPort }: { app: App; deployed: boolean; onE
           {app.port || <Text span c="orange" size="sm">Not set</Text>}
         </Fact>
         <Fact label="Runtime">
-          {app.runtime === 'docker' ? 'Docker' : app.runtime === 'native' ? 'Native process' : <Dimmed>Detected on first deploy</Dimmed>}
+          {app.runtime === 'docker' ? 'Docker' : app.runtime === 'native' ? 'Native Process' : <Dimmed>Detected on first deploy</Dimmed>}
         </Fact>
         <Fact label="Health check">
           {!deployed ? (
@@ -142,9 +142,9 @@ function Facts({ app, deployed, onEditPort }: { app: App; deployed: boolean; onE
           ) : (
             app.health_check || (
               <>
-                <Dimmed>Process running</Dimmed>{' '}
+                <Dimmed>Not set up</Dimmed>{' '}
                 <Anchor component={Link} to={appPath(app.project_id, app.id, 'monitoring')} size="sm">
-                  Set up
+                  Add one
                 </Anchor>
               </>
             )

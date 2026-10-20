@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { ActionIcon, Alert, Badge, Button, Center, Loader, Modal, Stack, Tabs, Tooltip } from '@mantine/core';
+import { ActionIcon, Alert, Badge, Button, Center, Loader, Modal, Stack, Tabs, Text, Tooltip } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconPencil, IconPlayerPlay, IconPlayerStop, IconRefresh, IconRocket } from '@tabler/icons-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -47,8 +47,17 @@ function deployedSummary(a: App): ReactNode {
   );
   return (
     <>
-      {when} · {a.git_branch || 'main'} @ <Commit gitUrl={a.git_url} sha={d.git_commit} />
-      {d.git_message && ` · ${d.git_message}`}
+      {when} · {a.git_branch || 'main'} @ <Commit gitUrl={a.git_url} sha={d.git_commit} message={d.git_message} />
+      {d.git_message && (
+        <>
+          {' · '}
+          <Tooltip label={d.git_message} multiline maw={480} style={{ whiteSpace: 'pre-wrap' }} openDelay={300}>
+            <Text span inherit truncate maw="min(640px, 60vw)" display="inline-block" style={{ verticalAlign: 'bottom' }}>
+              {d.git_message.split('\n')[0]}
+            </Text>
+          </Tooltip>
+        </>
+      )}
     </>
   );
 }

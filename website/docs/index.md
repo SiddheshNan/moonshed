@@ -1,6 +1,6 @@
 # What is Moonshed?
 
-Moonshed is a self-hosted platform for deploying your apps, in the same space as Dokploy or Coolify, but built to stay small. It is a single Go binary with SQLite, it runs on Linux and Windows, and it is comfortable on a server with 1 core and 1 GB of RAM.
+Moonshed is a self-hosted platform for deploying your apps, in the same space as Dokploy or Coolify, but built to stay small. It is a single binary with SQLite, it runs on Linux and Windows, and it is comfortable on a server with 1 core and 1 GB of RAM.
 
 ![Moonshed dashboard](/screenshots/dashboard.png)
 
@@ -11,7 +11,7 @@ Moonshed is pre-release. Expect rough edges and breaking changes between version
 ## What you get
 
 - **Deploys** from GitHub (through a GitHub App), any git URL, a zip upload, or CI with an API token. Pushes can deploy automatically.
-- **Native or Docker apps.** An app runs either as a plain process that Moonshed supervises, or as a Docker container.
+- **Native Process or Docker apps.** An app runs either as a plain process that Moonshed supervises, or as a Docker container.
 - **Health-checked rollouts.** If the new version doesn't come up healthy, the old one is started again.
 - **A built-in reverse proxy** (Caddy) with domains and automatic HTTPS.
 - **Monitoring**: resource graphs, uptime and incidents from real health checks, optional auto-restart and a request log.

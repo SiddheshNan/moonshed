@@ -282,7 +282,7 @@ export function DomainEditor({ domain, onClose, onSaved }: { domain: Domain | nu
                   onChange={(e) => set({ allowIPs: e.currentTarget.value })}
                 />
                 <Text size="xs" c="dimmed">
-                  Behind Cloudflare or a load balancer, add it under Settings › Proxy › Trusted proxies so the real visitor IP is used.
+                  Behind Cloudflare or a load balancer, add it under Settings › Reverse Proxy (Caddy) › Trusted proxies so the real visitor IP is used.
                 </Text>
               </Stack>
             </Tabs.Panel>

@@ -57,7 +57,7 @@ The rest of `runtime/` (databases, apps, logs, backups) is created on first run.
 
 ## Before you put it on the internet
 
-- The panel on port 5050 is plain HTTP. Give it a domain with HTTPS (Settings › General › Panel domain) and set `panel_addr: "127.0.0.1:5050"` so it is only reachable through that domain. See [Domains and HTTPS](/docs/domains#the-panel).
+- The panel on port 5050 is plain HTTP. Give it a domain with HTTPS (Settings › Reverse Proxy (Caddy) › Panel access) and set `panel_addr: "127.0.0.1:5050"` so it is only reachable through that domain. See [Domains and HTTPS](/docs/domains#the-panel).
 - Ports 80 and 443 must be free and open for the reverse proxy and Let's Encrypt.
 - Install Docker if you want to run Docker apps. Moonshed works without it.
 

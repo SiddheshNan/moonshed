@@ -42,7 +42,7 @@ export function Logs({ app }: { app: App }) {
               saving={save.isPending}
               onSave={(v, done) => save.mutate({ log_retention_days: v }, { onSuccess: done })}
             >
-              Kept for {app.log_retention_days} days ·
+             Logs are kept for {app.log_retention_days} days ·
             </InlineSetting>
           )}
           {day && day !== 'live' && (

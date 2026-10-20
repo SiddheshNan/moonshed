@@ -100,12 +100,18 @@ export function NewAppModal({ opened, onClose, projectId }: { opened: boolean; o
               }}
               data={[
                 { value: 'upload', label: 'Zip upload' },
-                { value: 'github', label: 'GitHub' },
+                { value: 'github', label: 'GitHub App' },
                 { value: 'git', label: 'Git URL' },
               ]}
             />
           </Stack>
-          {source !== 'upload' && <GitSourceFields value={git} onChange={setGit} onDialog={setAddingToken} />}
+          {source === 'upload' ? (
+            <Text size="sm" c="dimmed">
+              You'll upload the zip after the app is created.
+            </Text>
+          ) : (
+            <GitSourceFields value={git} onChange={setGit} onDialog={setAddingToken} />
+          )}
           <Group justify="flex-end" gap="sm">
             <Button variant="default" onClick={onClose}>
               Cancel

@@ -155,8 +155,7 @@ export function Dashboard() {
         />
         <MetricChart
           title="Memory"
-          value={s ? formatBytes(s.mem_used) : '—'}
-          detail={s ? `of ${formatBytes(s.mem_total)} · ${formatPercent((s.mem_used / s.mem_total) * 100, 0)}` : undefined}
+          value={s ? <Usage used={s.mem_used} total={s.mem_total} /> : '—'}
           range={range}
           series={metrics.data}
           keys={[{ key: 'mem', label: 'Used', color: 'violet.5' }]}
@@ -165,8 +164,20 @@ export function Dashboard() {
         />
         <MetricChart
           title="Network"
-          value={s ? `↓ ${formatBytes(s.net_in)}/s` : '—'}
-          detail={s ? `↑ ${formatBytes(s.net_out)}/s` : undefined}
+          value={
+            s ? (
+              <Group gap="lg" component="span">
+                <span>
+                  <Text span c="cyan.5" inherit>↓</Text> {formatBytes(s.net_in)}/s
+                </span>
+                <span>
+                  <Text span c="indigo.5" inherit>↑</Text> {formatBytes(s.net_out)}/s
+                </span>
+              </Group>
+            ) : (
+              '—'
+            )
+          }
           range={range}
           series={metrics.data}
           keys={[
@@ -178,8 +189,7 @@ export function Dashboard() {
         />
         <MetricChart
           title="Disk"
-          value={s ? formatBytes(s.disk_used) : '—'}
-          detail={s ? `of ${formatBytes(s.disk_total)} · ${formatPercent((s.disk_used / s.disk_total) * 100, 0)}` : undefined}
+          value={s ? <Usage used={s.disk_used} total={s.disk_total} /> : '—'}
           range={range}
           series={metrics.data}
           keys={[{ key: 'disk', label: 'Used', color: 'orange.5' }]}
@@ -190,5 +200,17 @@ export function Dashboard() {
 
       <NewAppModal opened={creating} onClose={() => setCreating(false)} />
     </Stack>
+  );
+}
+
+// Usage shows a percentage big, with the amounts beside it smaller and dimmed.
+function Usage({ used, total }: { used: number; total: number }) {
+  return (
+    <>
+      {formatPercent((used / total) * 100, 0)}
+      <Text span c="dimmed" fz="sm" fw={500} ml={8}>
+        {formatBytes(used)} of {formatBytes(total)}
+      </Text>
+    </>
   );
 }

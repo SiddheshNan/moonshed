@@ -1,9 +1,6 @@
 package store
 
-import (
-	"strings"
-	"time"
-)
+import "strings"
 
 const (
 	ActorUser    = "user"
@@ -80,9 +77,4 @@ func (s *Store) Audit(f AuditFilter) ([]*AuditEntry, error) {
 		out = append(out, &e)
 	}
 	return out, rows.Err()
-}
-
-func (s *Store) PruneAudit(before time.Time) error {
-	_, err := s.db.Exec("DELETE FROM audit_log WHERE ts < ?", before.Unix())
-	return err
 }

@@ -74,7 +74,7 @@ type Collector struct {
 	disk     map[string]int64
 	diskAt   time.Time
 	prevCPU  map[string]cpuMark
-	prevNet  psnet.IOCountersStat
+	prevNet  map[string]psnet.IOCountersStat
 	prevTime time.Time
 }
 
@@ -219,15 +219,37 @@ func (c *Collector) collectServer(now time.Time) ServerStats {
 	if l, err := load.Avg(); err == nil {
 		s.Load1 = l.Load1
 	}
-	if io, err := psnet.IOCounters(false); err == nil && len(io) > 0 {
-		if !c.prevTime.IsZero() {
-			elapsed := now.Sub(c.prevTime).Seconds()
-			s.NetIn = float64(io[0].BytesRecv-c.prevNet.BytesRecv) / elapsed
-			s.NetOut = float64(io[0].BytesSent-c.prevNet.BytesSent) / elapsed
+	if io, err := psnet.IOCounters(true); err == nil {
+		if elapsed := now.Sub(c.prevTime).Seconds(); !c.prevTime.IsZero() && elapsed > 0 {
+			in, out := netDelta(c.prevNet, io)
+			s.NetIn, s.NetOut = float64(in)/elapsed, float64(out)/elapsed
 		}
-		c.prevNet, c.prevTime = io[0], now
+		c.prevNet = make(map[string]psnet.IOCountersStat, len(io))
+		for _, n := range io {
+			c.prevNet[n.Name] = n
+		}
+		c.prevTime = now
 	}
 	return s
+}
+
+// netDelta sums the bytes each interface received and sent since prev. Counters are unsigned, so an
+// interface whose counters went down (reset on sleep/wake, or removed and re-added) would wrap
+// around to ~1.8e19 bytes; it, and any interface new since prev, counts as 0 for this sample.
+func netDelta(prev map[string]psnet.IOCountersStat, cur []psnet.IOCountersStat) (in, out uint64) {
+	for _, n := range cur {
+		p, ok := prev[n.Name]
+		if !ok {
+			continue
+		}
+		if n.BytesRecv >= p.BytesRecv {
+			in += n.BytesRecv - p.BytesRecv
+		}
+		if n.BytesSent >= p.BytesSent {
+			out += n.BytesSent - p.BytesSent
+		}
+	}
+	return in, out
 }
 
 // collectApps measures every running app. Apps that aren't running produce no samples.

@@ -64,13 +64,15 @@ export function Environment({ app }: { app: App }) {
         <div>
           <Text fw={600}>Environment variables</Text>
           <Text size="sm" c="dimmed">
-            One <Code>KEY=value</Code> per line, stored encrypted. Also set by the platform: <Code>PORT</Code>, <Code>APP_NAME</Code>, <Code>RELEASE_ID</Code>
+            Write one <Code>KEY=value</Code> per line. Restart the app to apply changes.
+          </Text>
+          <Text size="sm" c="dimmed" mt={4}>
+            Moonshed sets following env variables <Code>PORT</Code>, <Code>APP_NAME</Code>, <Code>RELEASE_ID</Code>
             {app.runtime === 'native' && (
               <>
-                , <Code>APP_DIR</Code>, <Code>SHARED_DIR</Code> and <Code>CACHE_DIR</Code>
+                , <Code>APP_DIR</Code>, <Code>SHARED_DIR</Code>, <Code>CACHE_DIR</Code>
               </>
-            )}
-            .
+            )}.
           </Text>
         </div>
         {parseError && (

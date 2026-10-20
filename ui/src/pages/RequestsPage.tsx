@@ -81,7 +81,7 @@ export function RequestsPage() {
                 <Badge color={active ? 'red' : 'gray'}>{active ? 'Recording' : 'Off'}</Badge>
               </Group>
               <Text size="sm" c="dimmed">
-                Keeps the last {recording.data?.cap.toLocaleString() ?? '100,000'} requests per app. Stopping deletes everything recorded.
+                Captures requests to the apps you pick from the reverse proxy, so you can inspect or debug them here.
               </Text>
             </div>
             {active && (

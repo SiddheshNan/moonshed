@@ -18,8 +18,9 @@ export function TLSPicker({ value, onChange, disabled }: { value: TLSMode; onCha
         value={https ? 'https' : 'http'}
         onChange={(v) => onChange(v === 'http' ? 'none' : 'letsencrypt')}
         data={[
-          { value: 'https', label: 'HTTPS' },
           { value: 'http', label: 'HTTP only' },
+          { value: 'https', label: 'HTTPS' },
+
         ]}
       />
       {https && (

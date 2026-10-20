@@ -1,4 +1,5 @@
-import { Badge, FileInput, Group, PasswordInput, SegmentedControl, SimpleGrid, Stack, Text } from '@mantine/core';
+import { ActionIcon, Badge, Button, FileButton, Group, Input, PasswordInput, SegmentedControl, SimpleGrid, Stack, Text } from '@mantine/core';
+import { IconUpload, IconX } from '@tabler/icons-react';
 
 import { formatDateTime } from '../format';
 import type { CertInfo } from '../types';
@@ -43,16 +44,53 @@ export function CertificateFields({ value, onChange }: { value: CertificateValue
       />
       {value.kind === 'pem' ? (
         <SimpleGrid cols={{ base: 1, sm: 2 }}>
-          <FileInput label="Certificate (with chain)" placeholder=".crt / .pem" value={value.cert} onChange={(cert) => set({ cert })} clearable />
-          <FileInput label="Private key" placeholder=".key" value={value.key} onChange={(key) => set({ key })} clearable />
+          <FilePick label="Certificate (with chain)" hint=".crt or .pem" accept=".crt,.pem,.cer" value={value.cert} onChange={(cert) => set({ cert })} />
+          <FilePick label="Private key" hint=".key or .pem" accept=".key,.pem" value={value.key} onChange={(key) => set({ key })} />
         </SimpleGrid>
       ) : (
         <SimpleGrid cols={{ base: 1, sm: 2 }}>
-          <FileInput label="PFX file" placeholder=".pfx / .p12" value={value.pfx} onChange={(pfx) => set({ pfx })} clearable />
+          <FilePick label="PFX file" hint=".pfx or .p12" accept=".pfx,.p12" value={value.pfx} onChange={(pfx) => set({ pfx })} />
           <PasswordInput label="PFX password" value={value.password} onChange={(e) => set({ password: e.currentTarget.value })} />
         </SimpleGrid>
       )}
     </Stack>
+  );
+}
+
+// FilePick is a labelled "Choose file" button with the picked file's name beside it.
+function FilePick({
+  label,
+  hint,
+  accept,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  accept: string;
+  value: File | null;
+  onChange: (f: File | null) => void;
+}) {
+  return (
+    <Input.Wrapper label={label}>
+      <Group gap="sm" wrap="nowrap" mih={36}>
+        <FileButton onChange={onChange} accept={accept}>
+          {(props) => (
+            <Button {...props} variant="default" leftSection={<IconUpload size={16} />} style={{ flexShrink: 0 }}>
+              {value ? 'Change' : 'Choose file'}
+            </Button>
+          )}
+        </FileButton>
+        <Text size="sm" c={value ? undefined : 'dimmed'} truncate>
+          {value ? value.name : hint}
+        </Text>
+        {value && (
+          <ActionIcon variant="subtle" color="gray" onClick={() => onChange(null)} aria-label={`Remove ${label}`}>
+            <IconX size={14} />
+          </ActionIcon>
+        )}
+      </Group>
+    </Input.Wrapper>
   );
 }
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Button, Group, Modal, PasswordInput, Stack, TextInput } from '@mantine/core';
+import { Alert, Button, Group, Modal, PasswordInput, Stack, Text, TextInput } from '@mantine/core';
 import { useMutation } from '@tanstack/react-query';
 
 import { api, queryClient } from '../api';
@@ -19,7 +19,7 @@ function initialForm(credential: GitCredential | 'new' | null, host: string): Fo
   return { name: '', host, username: tokenUsers[host] ?? '', token: '' };
 }
 
-// CredentialModal adds or edits a git access token. onSaved gets the stored credential.
+// CredentialModal adds or edits a git login: a username and access token for cloning from a git host. onSaved gets the stored credential.
 export function CredentialModal({
   credential,
   host = '',
@@ -53,7 +53,7 @@ export function CredentialModal({
   });
 
   return (
-    <Modal opened={credential !== null} onClose={onClose} title={isNew ? 'Add access token' : 'Edit access token'}>
+    <Modal opened={credential !== null} onClose={onClose} title={isNew ? 'Add git login' : 'Edit git login'}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -66,14 +66,26 @@ export function CredentialModal({
               {save.error.message}
             </Alert>
           )}
-          <TextInput label="Name" placeholder="Work account" value={form.name} onChange={(e) => setForm({ ...form, name: e.currentTarget.value })} required data-autofocus />
+          <Text size="sm" c="dimmed">
+            Moonshed uses this to clone private repositories. Create a personal access token on the git host with read access to repositories and
+            paste it here.
+          </Text>
+          <TextInput
+            label="Name"
+            description="Friendly name to identify this git"
+            placeholder="Work GitLab"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.currentTarget.value })}
+            required
+            data-autofocus
+          />
           <TextInput label="Host" placeholder="gitlab.com" value={form.host} onChange={(e) => setForm({ ...form, host: e.currentTarget.value })} required />
           {!fixedUser && (
             <TextInput label="Username" placeholder="Your username on that host" value={form.username} onChange={(e) => setForm({ ...form, username: e.currentTarget.value })} required />
           )}
           <PasswordInput
-            label="Token"
-            description="Read access to repositories is enough"
+            label="Personal access token"
+            description="Made on the git host, e.g. GitLab › Preferences › Access tokens. Read access to repositories is enough."
             placeholder={isNew ? '' : '•••••••• (unchanged)'}
             value={form.token}
             onChange={(e) => setForm({ ...form, token: e.currentTarget.value })}

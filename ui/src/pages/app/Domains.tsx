@@ -153,7 +153,7 @@ export function Domains({ app }: { app: App }) {
         {!proxyOff && !app.port && (
           <Group justify="space-between" mt="xs" wrap="nowrap">
             <Text size="sm" c="dimmed">
-              The app needs a port first.
+              The app needs a port first. please set it up.
             </Text>
             <Button size="compact-sm" variant="default" onClick={() => setSettingPort(true)}>
               Set port

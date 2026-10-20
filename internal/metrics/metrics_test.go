@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	psnet "github.com/shirou/gopsutil/v4/net"
 )
 
 func TestAggregateAndRead(t *testing.T) {
@@ -61,5 +63,22 @@ func TestAggregateAndRead(t *testing.T) {
 	empty, err := db.Series("app:2", []string{"cpu"}, time.Hour)
 	if err != nil || len(empty["cpu"]) != 0 {
 		t.Fatalf("unknown target should have no points, got %+v %v", empty, err)
+	}
+}
+
+func TestNetDeltaIgnoresResetCounters(t *testing.T) {
+	prev := map[string]psnet.IOCountersStat{
+		"en0":  {Name: "en0", BytesRecv: 1000, BytesSent: 500},
+		"awdl": {Name: "awdl", BytesRecv: 9000, BytesSent: 9000},
+	}
+	// After sleep/wake: en0 grew, awdl was reset to near zero, utun is new.
+	cur := []psnet.IOCountersStat{
+		{Name: "en0", BytesRecv: 1600, BytesSent: 700},
+		{Name: "awdl", BytesRecv: 10, BytesSent: 20},
+		{Name: "utun3", BytesRecv: 5000, BytesSent: 5000},
+	}
+	in, out := netDelta(prev, cur)
+	if in != 600 || out != 200 {
+		t.Fatalf("got in=%d out=%d, want 600 and 200", in, out)
 	}
 }

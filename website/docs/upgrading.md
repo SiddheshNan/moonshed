@@ -3,7 +3,7 @@
 An upgrade replaces two things: the `moonshed` binary and the `runtime/web/` folder. Keep the rest of `runtime/` as it is. It holds your configuration, databases, apps and backups.
 
 1. Read the [changelog](/changelog) for the new version.
-2. Make a platform backup from **Settings › General**.
+2. Make a platform backup from **Settings › Backups**.
 3. Download the new release, stop Moonshed, copy the two parts over and start it again.
 
 ::: code-group
@@ -38,7 +38,7 @@ Start-Service moonshed
 Don't unpack the new archive straight over your install. It contains a default `runtime/config/production.yaml` that would replace yours.
 :::
 
-Native apps are stopped and started again along with Moonshed. Docker containers keep running and are reattached.
+Native Process apps are stopped and started again along with Moonshed. Docker containers keep running and are reattached.
 
 ::: warning Pre-release
 Until the first stable release, an upgrade can include breaking changes.

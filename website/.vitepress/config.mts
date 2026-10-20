@@ -35,7 +35,7 @@ export default defineConfig({
         {
           text: 'Deploying',
           items: [
-            { text: 'Native apps', link: '/docs/native-apps' },
+            { text: 'Native Process apps', link: '/docs/native-apps' },
             { text: 'Docker apps', link: '/docs/docker-apps' },
             { text: 'Git and webhooks', link: '/docs/git' },
             { text: 'Deploying from CI', link: '/docs/ci' },

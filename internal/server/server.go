@@ -30,8 +30,6 @@ import (
 	"github.com/SiddheshNan/moonshed/internal/version"
 )
 
-const auditRetention = 365 * 24 * time.Hour
-
 type Server struct {
 	cfg     config.Config
 	paths   config.Paths
@@ -185,15 +183,12 @@ func (s *Server) Close() {
 	}
 }
 
-// prune drops old log files and audit entries once an hour.
+// prune drops old log files once an hour. The audit log is kept forever.
 func (s *Server) prune(ctx context.Context) {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
 	for {
 		logs.Prune(s.paths.Logs(), "moonshed", 30)
-		if err := s.store.PruneAudit(time.Now().Add(-auditRetention)); err != nil {
-			slog.Error("prune audit log", "err", err)
-		}
 		if apps, err := s.store.Apps(); err == nil {
 			for _, app := range apps {
 				logs.Prune(s.paths.App(app.Name).Logs(), "app", app.LogRetentionDays)
