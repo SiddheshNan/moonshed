@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write      # signs the build provenance
+  attestations: write
 
 jobs:
   release:
@@ -44,6 +46,12 @@ jobs:
             rm -rf moonshed
           done
           sha256sum *.tar.gz *.zip > SHA256SUMS
+
+      # Signed record that these archives were built by this workflow from this tag, checkable with
+      # `gh attestation verify <file> -R SiddheshNan/moonshed`.
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: dist/moonshed-*
 
       - name: Publish
         env:
