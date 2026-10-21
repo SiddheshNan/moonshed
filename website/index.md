@@ -64,10 +64,7 @@ restart_unhealthy: true
 ::: code-group
 
 ```bash [Linux]
-cd /opt
-tag=$(curl -fsSL "https://api.github.com/repos/SiddheshNan/moonshed/releases?per_page=1" | grep -m1 '"tag_name"' | cut -d'"' -f4)
-curl -fsSL "https://github.com/SiddheshNan/moonshed/releases/download/$tag/moonshed-linux-amd64.tar.gz" | sudo tar -xz
-cd moonshed && sudo ./moonshed install -e production
+curl -fsSL https://moonshed.siddhesh.me/install.sh | sh
 ```
 
 ```powershell [Windows]
@@ -79,7 +76,7 @@ cd C:\moonshed; .\moonshed.exe install -e production
 
 :::
 
-[Installation guide →](/docs/installation)
+[Installation guide →](/docs/installation) · [Read install.sh](https://github.com/SiddheshNan/moonshed/blob/main/website/public/install.sh)
 
 </div>
 

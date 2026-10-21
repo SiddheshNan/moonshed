@@ -10,6 +10,35 @@ Moonshed ships as one archive per platform: the binary, a default configuration 
 
 All releases are on the [GitHub releases page](https://github.com/SiddheshNan/moonshed/releases), with a `SHA256SUMS` file to check the downloads against.
 
+## Quick install on Linux
+
+Download the install script, read it, then run it:
+
+```bash
+curl -fsSL https://moonshed.siddhesh.me/install.sh -o install.sh
+less install.sh
+sh install.sh
+```
+
+Or in one line: `curl -fsSL https://moonshed.siddhesh.me/install.sh | sh`.
+
+The script picks the x86-64 or ARM64 build, downloads the latest release from GitHub, checks it against the release's `SHA256SUMS`, unpacks it into `/opt/moonshed` and installs it as a systemd service. Set `MOONSHED_DIR` to install somewhere else, or `MOONSHED_VERSION` (e.g. `v0.3.0`) for a specific release. Then open `http://<your-server>:5050` and create the admin account.
+
+To install by hand, or on Windows, follow the steps below.
+
+## Check what you download
+
+- **The script** is [install.sh on GitHub](https://github.com/SiddheshNan/moonshed/blob/main/website/public/install.sh), about 70 lines.
+- **The binary** is built by the public [release workflow](https://github.com/SiddheshNan/moonshed/blob/main/.github/workflows/release.yml) from the tagged commit, never on a personal machine. You can see every run on the [Actions tab](https://github.com/SiddheshNan/moonshed/actions/workflows/release.yml).
+- **Checksums:** each release has a `SHA256SUMS` file. Check a download with `sha256sum -c SHA256SUMS --ignore-missing`.
+- **Provenance:** each archive has a signed record from GitHub of the commit and workflow that built it. Check it with the [GitHub CLI](https://cli.github.com):
+
+  ```bash
+  gh attestation verify moonshed-linux-amd64.tar.gz -R SiddheshNan/moonshed
+  ```
+
+- **Or build it yourself** from source, see [Build from source](#build-from-source).
+
 ## Install on the server
 
 Download the latest release and unpack it where Moonshed should live. Everything it stores goes into a `runtime/` folder next to the binary.

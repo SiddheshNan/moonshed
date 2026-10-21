@@ -44,15 +44,15 @@ Each app runs either as a Native Process that Moonshed supervises (like pm2) or 
 
 ## Quick start
 
-Download the latest release on your server and install it as a service:
+On your Linux server, download the [install script](website/public/install.sh), read it, then run it:
 
 ```bash
-cd /opt
-tag=$(curl -fsSL "https://api.github.com/repos/SiddheshNan/moonshed/releases?per_page=1" | grep -m1 '"tag_name"' | cut -d'"' -f4)
-curl -fsSL "https://github.com/SiddheshNan/moonshed/releases/download/$tag/moonshed-linux-amd64.tar.gz" | sudo tar -xz
-cd moonshed
-sudo ./moonshed install -e production
+curl -fsSL https://moonshed.siddhesh.me/install.sh -o install.sh
+less install.sh
+sh install.sh
 ```
+
+It downloads the latest release into `/opt/moonshed`, checks it against the release checksums and installs it as a service. Releases are built by [GitHub Actions](.github/workflows/release.yml) from the tagged commit, with signed provenance ([how to check](https://moonshed.siddhesh.me/docs/installation#check-what-you-download)).
 
 Open `http://<server>:5050` and create the admin account.
 
