@@ -36,6 +36,16 @@ features:
 
 <div class="home-section">
 
+## See it deploy
+
+<p class="lead">Deploy a FastAPI app from a git repo, give it a domain, then redeploy. The todos survive because <code>data/</code> is persisted.</p>
+
+<video class="demo" src="/demo/demo.mp4" poster="/demo/demo-poster.jpg" autoplay muted loop playsinline controls></video>
+
+</div>
+
+<div class="home-section">
+
 ## One file per app
 
 <p class="lead">Add a <code>moonshed.yaml</code> to your app, or set the same things in the panel. A Dockerfile alone works too.</p>

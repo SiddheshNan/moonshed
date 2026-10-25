@@ -15,6 +15,16 @@
   max-width: 640px;
 }
 
+.demo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-top: 24px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: #09090b;
+}
+
 .screens {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

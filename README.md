@@ -13,7 +13,7 @@
 
 >  **Status: early development.** Moonshed is pre-release.  Expect rough edges and breaking changes.
 
-![Moonshed dashboard](website/public/screenshots/dashboard.png)
+![Moonshed demo: deploy an app from git, add a domain, redeploy and keep its data](website/public/demo/demo.gif)
 
 ## Why Moonshed
 
