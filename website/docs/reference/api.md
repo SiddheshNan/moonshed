@@ -29,7 +29,7 @@ The panel itself uses a session cookie. Webhook endpoints and the first-run setu
 
 ```
 GET    /api/auth/status
-POST   /api/auth/setup                      first-run admin account
+POST   /api/auth/setup                      first-run admin account (needs the setup link's token)
 POST   /api/auth/login
 POST   /api/auth/logout
 GET    /api/users                           POST /api/users

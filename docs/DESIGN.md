@@ -205,6 +205,7 @@ runtime/
     metrics.db           metrics tiers (separate to avoid write contention)
     requests.db          recorded requests
     secret.key           key used to encrypt env vars and passwords at rest
+    setup-token          one-time token for creating the first admin
   apps/<app>/
     bundles/<id>.zip     last X bundles (default 5, configurable per app)
     releases/<id>/       unpacked + built release (current, plus the new one during a deploy)
@@ -385,7 +386,7 @@ Backups live in `runtime/backups/`.
 
 ## 11. Auth and security
 
-- **Admin user:** created on first run. Login uses a session cookie that lasts 30 days.
+- **Admin user:** created through a setup link (`/setup?token=...`) printed by `install`, `serve` and `setup-link`. The token lives in `data/setup-token` until the admin exists, and `POST /api/auth/setup` rejects requests without it, so a fresh install exposed on the network can't be claimed by whoever reaches it first. The link's host is the IP of the network card with the default route. Login uses a session cookie that lasts 30 days.
 - **Login throttling:** 10 failed logins from one IP within 15 minutes blocks further attempts from it until the window passes.
 - **Other users:** local accounts. All users are admins.
 - **API tokens:** for CI / push deploys, prefixed `msh_`. Only a hash is stored.
@@ -489,13 +490,14 @@ Auth is a session cookie for the UI, or `Authorization: Bearer msh_...` for API 
 moonshed serve -e <env>             run the platform (normally run by the service)
 moonshed install -e <env>           register a systemd unit / Windows service (auto-start on boot)
 moonshed uninstall
+moonshed setup-link -e <env>        print the link to create the first admin
 moonshed reset-password <user>
 moonshed version
 ```
 
-- **`-e` (or `ENV`):** `development` or `production`, selecting `runtime/config/<env>.yaml`. Required for `serve` and `install`; Moonshed refuses to start when the file is missing, has unknown keys or leaves one out. `install` records it in the service definition.
+- **`-e` (or `ENV`):** `development` or `production`, selecting `runtime/config/<env>.yaml`. Required for `serve`, `install` and `setup-link`; Moonshed refuses to start when the file is missing, has unknown keys or leaves one out. `install` records it in the service definition.
 - **`--runtime` (or `RUNTIME_DIR`):** the runtime folder. Defaults to `runtime/` next to the binary, then `./runtime`.
-- **Install:** copy a release bundle (binary + `runtime/config/production.yaml` + `runtime/web/`), run `moonshed install -e production`, open the UI.
+- **Install:** copy a release bundle (binary + `runtime/config/production.yaml` + `runtime/web/`), run `moonshed install -e production`, open the setup link it prints.
 - **Upgrade:** replace the binary and `runtime/web/`, then restart the service. Apps restart with it.
 - **Release builds:** `scripts/build.py` writes the version, stamps a build ID (UTC `yyyyMMddHHmmss`, so `moonshed version` prints e.g. `0.1.0+20261019143005`), optionally vets and tests, builds the UI and cross-compiles one bundle per platform into `dist/<os>-<arch>/`. Pushing a `vX.Y.Z` tag runs the same build in GitHub Actions and publishes the archives as a release.
 - **Development:** `development.yaml` sets `ui` to the Vite dev server, so the panel forwards every non-API request to it and UI changes show up live, on `:5050` and on the panel's domain alike.

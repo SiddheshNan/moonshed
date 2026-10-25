@@ -54,6 +54,19 @@ func (s *Store) CreateUser(u *User) error {
 	return err
 }
 
+// CreateFirstUser adds u only while there are no users, in one statement so two
+// concurrent setups can't both succeed. It reports whether u was added.
+func (s *Store) CreateFirstUser(u *User) (bool, error) {
+	u.ID, u.CreatedAt = NewID(), Now()
+	res, err := s.db.Exec(`INSERT INTO users (id, username, password_hash, created_at)
+		SELECT ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM users)`, u.ID, u.Username, u.PasswordHash, u.CreatedAt)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
+}
+
 func (s *Store) SetPassword(userID string, hash string) error {
 	_, err := s.db.Exec("UPDATE users SET password_hash = ? WHERE id = ?", hash, userID)
 	if err != nil {

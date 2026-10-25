@@ -11,7 +11,7 @@
   <a href="CHANGELOG.md">Changelog</a>
 </p>
 
->  **Status: early development.** Moonshed is pre-release.  Expect rough edges and breaking changes.
+> **Status: early.** Moonshed works, but expect rough edges and breaking changes before 1.0.
 
 ![Moonshed demo: deploy an app from git, add a domain, redeploy and keep its data](website/public/demo/demo.gif)
 
@@ -19,22 +19,20 @@
 
 Tools like Dokploy and Coolify need Postgres, Redis, Traefik and Docker before your first app runs. Moonshed is a single binary with SQLite and a built-in Caddy reverse proxy. It runs fine on 1 core and 1 GB of RAM.
 
-Each app runs either as a Native Process that Moonshed supervises (like pm2) or as a Docker container. The app can be simply configured using `moonshed.yaml` in your repo, or from directly on the moonshed webui.
+Each app runs either as a Native Process that Moonshed supervises (like pm2) or as a Docker container. Configure it with a `moonshed.yaml` in your repo or from the web UI.
 
 ## Features
 
 - Deploy from a GitHub App, any git URL, a zip upload or CI
-- Supports app to be deployed as a Native Process or Docker container
-- A new version of app only replaces the old one (after its health check passes)
-- Redeploy any older version of app
-- Docker builds support with BuildKit
+- Run apps as Native Processes or Docker containers
+- A new version replaces the old one only after its health check passes
+- Redeploy any older version
+- Docker builds with BuildKit
 - Domains, path routing and automatic HTTPS
 - Health checks, logs, resource graphs and uptime monitoring per app
-- persistent data folders and encrypted environment variables that survive deploys
+- Persistent data folders and encrypted environment variables that survive deploys
 - App and platform backups, on a schedule or on demand
 - Projects, users, API tokens and an audit log
-
-
 
 | App overview | Deployments |
 |---|---|
@@ -54,13 +52,13 @@ sh install.sh
 
 It downloads the latest release into `/opt/moonshed`, checks it against the release checksums and installs it as a service. Releases are built by [GitHub Actions](.github/workflows/release.yml) from the tagged commit, with signed provenance ([how to check](https://moonshed.siddhesh.me/docs/installation#check-what-you-download)).
 
-Open `http://<server>:5050` and create the admin account.
+It ends with a setup link; open it to create the admin account. Lost it? Run `sudo /opt/moonshed/moonshed setup-link -e production`.
 
 Releases are built for Linux (x86-64 and ARM64) and Windows (x86-64). See the [installation guide](https://moonshed.siddhesh.me/docs/installation) for Windows, putting the panel behind HTTPS, upgrading, and building from source.
 
 ## Deploy an app
 
-Add a `moonshed.yaml` to your app, or set the same things in the webui:
+Add a `moonshed.yaml` to your app, or set the same things in the web UI:
 
 ```yaml
 pre: |
@@ -87,7 +85,7 @@ To try it, deploy one of the [examples](examples): a Flask hello world, a FastAP
 ## Current limitations
 
 - One server only, no clustering or multi-server deployments.
-- A short gap during each deploy while the old version stops, this is by design on v1
+- A short gap during each deploy while the old version stops and the new one starts.
 - No per-app CPU or memory limits.
 - Native Process apps aren't sandboxed. You will need to give an app its own OS user to limit what it can touch.
 

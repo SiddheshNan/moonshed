@@ -125,6 +125,7 @@ func (p Paths) DB() string         { return filepath.Join(p.Data(), "moonshed.db
 func (p Paths) MetricsDB() string  { return filepath.Join(p.Data(), "metrics.db") }
 func (p Paths) RequestsDB() string { return filepath.Join(p.Data(), "requests.db") }
 func (p Paths) SecretKey() string  { return filepath.Join(p.Data(), "secret.key") }
+func (p Paths) SetupToken() string { return filepath.Join(p.Data(), "setup-token") }
 func (p Paths) Apps() string       { return filepath.Join(p.Root, "apps") }
 func (p Paths) Certs() string      { return filepath.Join(p.Root, "certs") }
 func (p Paths) Backups() string    { return filepath.Join(p.Root, "backups") }

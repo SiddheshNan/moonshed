@@ -11,6 +11,7 @@ runtime/
     metrics.db               metrics
     requests.db              recorded requests
     secret.key               encrypts env vars and passwords
+    setup-token              one-time token for the setup link, removed once the admin exists
   apps/<app>/
     bundles/<id>.zip         the last few deployed versions
     releases/<id>/           the running release, plus the new one during a deploy

@@ -22,7 +22,7 @@ sh install.sh
 
 Or in one line: `curl -fsSL https://moonshed.siddhesh.me/install.sh | sh`.
 
-The script picks the x86-64 or ARM64 build, downloads the latest release from GitHub, checks it against the release's `SHA256SUMS`, unpacks it into `/opt/moonshed` and installs it as a systemd service. Set `MOONSHED_DIR` to install somewhere else, or `MOONSHED_VERSION` (e.g. `v0.3.0`) for a specific release. Then open `http://<your-server>:5050` and create the admin account.
+The script picks the x86-64 or ARM64 build, downloads the latest release from GitHub, checks it against the release's `SHA256SUMS`, unpacks it into `/opt/moonshed` and installs it as a systemd service. Set `MOONSHED_DIR` to install somewhere else, or `MOONSHED_VERSION` (e.g. `v0.3.0`) for a specific release. When it finishes it prints a setup link; open it to create the admin account. If you lose the link, run `sudo /opt/moonshed/moonshed setup-link -e production` to print it again.
 
 To install by hand, or on Windows, follow the steps below.
 
@@ -80,7 +80,9 @@ sudo ./moonshed install -e production
 
 On Linux this writes a systemd unit to `/etc/systemd/system/moonshed.service`. On Windows it registers a Windows service. Either way Moonshed starts now and on every boot.
 
-Open `http://<your-server>:5050` and create the admin account.
+`install` ends with a setup link like `http://203.0.113.10:5050/setup?token=...`. Open it to create the admin account. The IP is your server's network card; behind NAT, swap in the public IP. Until the admin exists, the panel only lets you set up through this link, so nobody else who reaches port 5050 can take it over.
+
+Lost the link? Run `moonshed setup-link -e production` in the same folder (with `sudo` on Linux) to print it again.
 
 ![Login page](/screenshots/login.png)
 

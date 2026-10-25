@@ -15,6 +15,7 @@ import (
 	"github.com/SiddheshNan/moonshed/internal/secret"
 	"github.com/SiddheshNan/moonshed/internal/server"
 	"github.com/SiddheshNan/moonshed/internal/service"
+	"github.com/SiddheshNan/moonshed/internal/setup"
 	"github.com/SiddheshNan/moonshed/internal/store"
 	"github.com/SiddheshNan/moonshed/internal/version"
 )
@@ -25,12 +26,13 @@ Commands:
   serve                   run Moonshed
   install                 register as a systemd unit / Windows service and start it
   uninstall               stop and remove the service
+  setup-link              print the link to create the first admin
   reset-password <user>   set a new random password for a user
   version                 print the version
 
 Flags:
   -e ENV          development or production, selects runtime/config/<ENV>.yaml (or set ENV).
-                  Required for serve and install.
+                  Required for serve, install and setup-link.
   --runtime DIR   runtime directory (or set RUNTIME_DIR). Defaults to runtime/ next to the
                   binary, then ./runtime.
 `
@@ -57,11 +59,11 @@ func main() {
 	case "serve":
 		err = serve(*env, paths)
 	case "install":
-		if _, err = config.Load(*env, paths); err == nil {
-			err = service.Install(*env, root)
-		}
+		err = install(*env, paths)
 	case "uninstall":
 		err = service.Uninstall()
+	case "setup-link":
+		err = setupLink(*env, paths)
 	case "reset-password":
 		err = resetPassword(paths, firstArg(args))
 	case "version":
@@ -88,15 +90,73 @@ func serve(env string, paths config.Paths) error {
 	return service.Run(srv.Run)
 }
 
+// install creates the setup token before the service starts, so the link printed
+// here is the one the service accepts.
+func install(env string, paths config.Paths) error {
+	cfg, err := config.Load(env, paths)
+	if err != nil {
+		return err
+	}
+	token, err := pendingSetup(paths)
+	if err != nil {
+		return err
+	}
+	if err := service.Install(env, paths.Root); err != nil {
+		return err
+	}
+	fmt.Println()
+	if token == "" {
+		fmt.Println("Moonshed is running:", setup.PanelURL(cfg.PanelAddr))
+		return nil
+	}
+	fmt.Println("Moonshed is running. Create the admin account:")
+	fmt.Println(setup.Link(cfg.PanelAddr, token))
+	return nil
+}
+
+func setupLink(env string, paths config.Paths) error {
+	cfg, err := config.Load(env, paths)
+	if err != nil {
+		return err
+	}
+	token, err := pendingSetup(paths)
+	if err != nil {
+		return err
+	}
+	if token == "" {
+		fmt.Println("Setup is already done. Sign in at", setup.PanelURL(cfg.PanelAddr))
+		fmt.Println("Forgot the password? Run: moonshed reset-password <user>")
+		os.Exit(1)
+	}
+	fmt.Println(setup.Link(cfg.PanelAddr, token))
+	return nil
+}
+
+func pendingSetup(paths config.Paths) (string, error) {
+	if err := paths.Init(); err != nil {
+		return "", err
+	}
+	st, err := openStore(paths)
+	if err != nil {
+		return "", err
+	}
+	defer st.Close()
+	return setup.Pending(st, paths)
+}
+
+func openStore(paths config.Paths) (*store.Store, error) {
+	box, err := secret.LoadOrCreate(paths.SecretKey())
+	if err != nil {
+		return nil, err
+	}
+	return store.Open(paths.DB(), box)
+}
+
 func resetPassword(paths config.Paths, username string) error {
 	if username == "" {
 		return errors.New("usage: moonshed reset-password <user>")
 	}
-	box, err := secret.LoadOrCreate(paths.SecretKey())
-	if err != nil {
-		return err
-	}
-	st, err := store.Open(paths.DB(), box)
+	st, err := openStore(paths)
 	if err != nil {
 		return err
 	}

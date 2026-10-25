@@ -37,18 +37,20 @@ type Deps struct {
 	Build      string
 	PanelAddr  string
 	ConfigFile string
-	DevUI      *url.URL
-	Paths      config.Paths
-	Store      *store.Store
-	Deploy     *deploy.Manager
-	Docker     *engine.Docker
-	Metrics    *metrics.Collector
-	MetricsDB  *metrics.DB
-	Monitor    *health.Monitor
-	Backups    *backup.Service
-	Proxy      *proxy.Proxy
-	GitHub     *githost.GitHub
-	Requests   *requestlog.Log
+	// SetupCommand prints the setup link on this server, shown while no admin exists.
+	SetupCommand string
+	DevUI        *url.URL
+	Paths        config.Paths
+	Store        *store.Store
+	Deploy       *deploy.Manager
+	Docker       *engine.Docker
+	Metrics      *metrics.Collector
+	MetricsDB    *metrics.DB
+	Monitor      *health.Monitor
+	Backups      *backup.Service
+	Proxy        *proxy.Proxy
+	GitHub       *githost.GitHub
+	Requests     *requestlog.Log
 }
 
 type Server struct {

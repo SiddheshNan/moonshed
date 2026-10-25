@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/SiddheshNan/moonshed/internal/setup"
 	"github.com/SiddheshNan/moonshed/internal/store"
 )
 
@@ -74,6 +76,9 @@ func (s *Server) authStatus(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	resp := map[string]any{"setup_required": n == 0, "version": s.Version, "build": s.Build}
+	if n == 0 {
+		resp["setup_command"] = s.SetupCommand
+	}
 	if a, err := s.authenticate(r); err == nil {
 		resp["user"] = a.user
 	}
@@ -96,9 +101,15 @@ func (c *credentials) validate() error {
 	return nil
 }
 
-// setup creates the first admin. It only works while there are no users.
+type setupRequest struct {
+	credentials
+	Token string `json:"token"`
+}
+
+// setup creates the first admin. It needs the token from the setup link and only
+// works while there are no users.
 func (s *Server) setup(w http.ResponseWriter, r *http.Request) error {
-	var in credentials
+	var in setupRequest
 	if err := decode(r, &in); err != nil {
 		return err
 	}
@@ -112,9 +123,23 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) error {
 	if n > 0 {
 		return errorf(http.StatusConflict, "setup is already done")
 	}
-	u, err := s.newUser(in)
+	if !setup.Valid(s.Paths, in.Token) {
+		return errorf(http.StatusForbidden, "invalid setup link; run %s on the server for a new one", s.SetupCommand)
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
+	}
+	u := &store.User{Username: in.Username, PasswordHash: string(hash)}
+	created, err := s.Store.CreateFirstUser(u)
+	if err != nil {
+		return err
+	}
+	if !created {
+		return errorf(http.StatusConflict, "setup is already done")
+	}
+	if err := setup.Done(s.Paths); err != nil {
+		slog.Error("remove setup token", "err", err)
 	}
 	s.auditAs(r, store.ActorUser, u.Username, "user.setup", "user", u.ID, u.Username, "")
 	return s.startSession(w, r, u)
