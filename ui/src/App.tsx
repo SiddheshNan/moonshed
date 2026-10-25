@@ -39,7 +39,7 @@ export function App() {
     return (
       <>
         <OfflineBanner />
-        <Login setup={auth.data.setup_required} />
+        <Login setup={auth.data.setup_required} setupCommand={auth.data.setup_command} />
       </>
     );
   }

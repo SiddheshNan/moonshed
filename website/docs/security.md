@@ -2,7 +2,7 @@
 
 ## Users
 
-The first user is created when you open the panel for the first time. Add more under **Settings › Users**. Every user is an admin.
+The first user is created through the setup link that `moonshed install` prints. The link carries a one-time token stored in `runtime/data/setup-token`, so only someone with access to the server can create the first admin. Run `moonshed setup-link -e production` to print it again. Add more users under **Settings › Users**. Every user is an admin.
 
 Logins last 30 days. After 10 failed logins from one IP within 15 minutes, that IP is blocked until the window passes.
 

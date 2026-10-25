@@ -59,11 +59,8 @@ main() {
 
 	$sudo mkdir -p "$(dirname "$dir")"
 	$sudo mv "$tmp/moonshed" "$dir"
-	$sudo "$dir/moonshed" install -e production
-
-	echo
-	echo "Moonshed is running. Open http://<your-server>:5050 to create the admin account."
 	echo "Config: $dir/runtime/config/production.yaml"
+	$sudo "$dir/moonshed" install -e production
 }
 
 main "$@"

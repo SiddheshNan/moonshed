@@ -69,7 +69,7 @@ restart_unhealthy: true
 
 ## Install
 
-<p class="lead">Download the release, install the service, then open the panel on port 5050.</p>
+<p class="lead">Download the release and install the service, then open the setup link it prints.</p>
 
 ::: code-group
 

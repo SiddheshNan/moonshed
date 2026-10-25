@@ -11,6 +11,7 @@ export interface User {
 
 export interface AuthStatus {
   setup_required: boolean;
+  setup_command?: string;
   version: string;
   build: string;
   user?: User;

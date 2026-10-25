@@ -4,6 +4,10 @@ Notable changes to Moonshed. Versions follow [semantic versioning](https://semve
 
 ## Unreleased
 
+- Creating the first admin now needs the setup link printed by `moonshed install`, so nobody else who reaches a fresh install's port 5050 can claim it. `moonshed setup-link` prints the link again.
+
+## v0.3.1 (2026-10-21)
+
 - One-line install on Linux: `curl -fsSL https://moonshed.siddhesh.me/install.sh | sh`. It picks the x86-64 or ARM64 build and checks the download against the release's `SHA256SUMS`.
 - Release archives come with signed build provenance, checkable with `gh attestation verify`.
 

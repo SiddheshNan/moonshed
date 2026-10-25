@@ -26,6 +26,7 @@ import (
 	"github.com/SiddheshNan/moonshed/internal/proxy"
 	"github.com/SiddheshNan/moonshed/internal/requestlog"
 	"github.com/SiddheshNan/moonshed/internal/secret"
+	"github.com/SiddheshNan/moonshed/internal/setup"
 	"github.com/SiddheshNan/moonshed/internal/store"
 	"github.com/SiddheshNan/moonshed/internal/version"
 )
@@ -88,18 +89,19 @@ func (s *Server) open() error {
 	github := githost.NewGitHub()
 	manager := deploy.NewManager(s.paths, s.store, engine.NewNative(), docker, github)
 	deps := &api.Deps{
-		Version:    version.Version,
-		Build:      version.Build,
-		PanelAddr:  s.cfg.PanelAddr,
-		ConfigFile: filepath.Join(filepath.Base(s.paths.Root), "config", s.cfg.Env+".yaml"),
-		DevUI:      devUI,
-		Paths:      s.paths,
-		Store:      s.store,
-		Deploy:     manager,
-		Docker:     docker,
-		MetricsDB:  s.metrics,
-		GitHub:     github,
-		Requests:   requests,
+		Version:      version.Version,
+		Build:        version.Build,
+		PanelAddr:    s.cfg.PanelAddr,
+		ConfigFile:   filepath.Join(filepath.Base(s.paths.Root), "config", s.cfg.Env+".yaml"),
+		SetupCommand: setup.Command(s.cfg.Env, s.paths),
+		DevUI:        devUI,
+		Paths:        s.paths,
+		Store:        s.store,
+		Deploy:       manager,
+		Docker:       docker,
+		MetricsDB:    s.metrics,
+		GitHub:       github,
+		Requests:     requests,
 	}
 	s.panel = api.New(deps)
 	s.panel.ConfigureRecording()
@@ -158,6 +160,11 @@ func (s *Server) Run(ctx context.Context) error {
 		slog.Info("panel listening", "addr", s.cfg.PanelAddr, "ui", d.DevUI.String())
 	} else {
 		slog.Info("panel listening", "addr", s.cfg.PanelAddr)
+	}
+	if token, err := setup.Pending(s.store, s.paths); err != nil {
+		slog.Error("setup token", "err", err)
+	} else if token != "" {
+		slog.Info("no admin yet, create one at " + setup.Link(s.cfg.PanelAddr, token))
 	}
 
 	var runErr error
