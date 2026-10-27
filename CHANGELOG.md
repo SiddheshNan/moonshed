@@ -2,6 +2,10 @@
 
 Notable changes to Moonshed. Versions follow [semantic versioning](https://semver.org).
 
+## Unreleased
+
+- Deploy and app logs stream live on the panel's own domain. Behind the reverse proxy they only showed up once the stream ended.
+
 ## v0.3.2 (2026-10-27)
 
 - Creating the first admin now needs the setup link printed by `moonshed install`, so nobody else who reaches a fresh install's port 5050 can claim it. `moonshed setup-link` prints the link again.

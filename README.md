@@ -13,7 +13,7 @@
 
 > **Status: early.** Moonshed works, but expect rough edges and breaking changes before 1.0.
 
-![Moonshed demo: deploy an app from git, add a domain, redeploy and keep its data](website/public/demo/demo.gif)
+![Moonshed demo: install on a fresh server, put the panel on HTTPS, deploy two apps from git with their own domains](website/public/demo/demo.gif)
 
 ## Why Moonshed
 
