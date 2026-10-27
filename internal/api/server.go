@@ -89,7 +89,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // trackingWriter records whether the response has started. It passes Flush through
-// because the log streams check for http.Flusher directly.
+// because the log streams check for http.Flusher directly. Behind Caddy (the panel
+// domain) the underlying writer only flushes through http.ResponseController.
 type trackingWriter struct {
 	http.ResponseWriter
 	started bool
@@ -106,9 +107,8 @@ func (t *trackingWriter) Write(b []byte) (int, error) {
 }
 
 func (t *trackingWriter) Flush() {
-	if f, ok := t.ResponseWriter.(http.Flusher); ok {
+	if http.NewResponseController(t.ResponseWriter).Flush() == nil {
 		t.started = true
-		f.Flush()
 	}
 }
 
