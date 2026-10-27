@@ -38,7 +38,7 @@ features:
 
 ## See it deploy
 
-<p class="lead">Deploy a FastAPI app from a git repo, give it a domain, then redeploy. The todos survive because <code>data/</code> is persisted.</p>
+<p class="lead">A fresh 1 GB droplet: install with one command, put the panel on HTTPS, deploy a FastAPI app and a Node game from git with their own domains. The todos survive a redeploy because <code>data/</code> is persisted.</p>
 
 <video class="demo" src="/demo/demo.mp4" poster="/demo/demo-poster.jpg" autoplay muted loop playsinline controls></video>
 
